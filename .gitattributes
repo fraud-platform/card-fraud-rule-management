@@ -1,0 +1,2 @@
+# Keep git hook scripts executable and LF-only
+.githooks/* text eol=lf
