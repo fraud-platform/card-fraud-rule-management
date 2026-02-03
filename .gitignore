@@ -70,10 +70,17 @@ logs/
 # Alembic (if used later)
 alembic/versions/*.pyc
 
-# Temporary exclusions until documentation/agent files are standardized
-docs/
+# Docs publication gate (curated only)
+docs/*
+!docs/README.md
+!docs/codemap.md
+
+# Local-only agent/session files
 CLAUDE.md
 claude.md
 STATUS.md
 status.md
 SESSION_HANDOFF.md
+
+# Local planning docs (not for remote)
+TODO.md
