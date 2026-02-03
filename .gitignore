@@ -70,10 +70,30 @@ logs/
 # Alembic (if used later)
 alembic/versions/*.pyc
 
-# Docs publication gate (curated only)
+# Docs publication gate (curated sections only)
 docs/*
 !docs/README.md
 !docs/codemap.md
+!docs/01-setup/
+!docs/01-setup/*.md
+!docs/02-development/
+!docs/02-development/*.md
+!docs/03-api/
+!docs/03-api/*.md
+!docs/04-testing/
+!docs/04-testing/*.md
+!docs/05-deployment/
+!docs/05-deployment/*.md
+!docs/06-operations/
+!docs/06-operations/*.md
+!docs/07-reference/
+!docs/07-reference/*.md
+
+# Never publish archived/temporary planning docs
+docs/archive/
+docs/**/archive/
+docs/**/*todo*.md
+docs/**/*status*.md
 
 # Local-only agent/session files
 CLAUDE.md
