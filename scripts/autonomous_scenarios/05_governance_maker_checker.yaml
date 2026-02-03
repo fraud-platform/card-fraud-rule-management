@@ -1,0 +1,119 @@
+# Governance Tests - Maker/Checker Workflows
+# Tests the maker-checker enforcement and approval workflows.
+category: governance
+name: Governance - Maker Checker
+description: Test maker-checker separation of duties enforcement
+tags: [governance, maker-checker, approvals]
+enabled: true
+idempotency_prefix: governance_maker_checker
+
+steps:
+  # Step 1: List pending approvals
+  - name: List Pending Approvals
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/approvals
+      auth: default
+      params:
+        status: "PENDING"
+    expect:
+      status: [200, 401]
+      json:
+        present: ["items"]
+
+  # Step 2: Create a rule as maker
+  - name: Create Rule as Maker
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rules
+      auth: default  # In real setup, this would be maker token
+      json:
+        rule_name: "Governance Test Rule"
+        description: "Rule for testing maker-checker"
+        rule_type: "AUTH"
+    expect:
+      status: [201, 409]
+    save:
+      - name: gov_rule_id
+        json_path: "$.rule_id"
+
+  # Step 3: Create rule version
+  - name: Create Governance Rule Version
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rules/{gov_rule_id}/versions
+      auth: default
+      json:
+        condition_tree:
+          logicalOperator: "AND"
+          conditions:
+            - field: "amount"
+              operator: "GT"
+              value: 1000
+        priority: 50
+    expect:
+      status: [201, 400]
+    save:
+      - name: gov_rule_version_id
+        json_path: "$.rule_version_id"
+    continue_on_error: true
+
+  # Step 4: Submit rule version for approval (maker action)
+  - name: Submit Rule Version for Approval
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rule-versions/{gov_rule_version_id}/submit
+      auth: default
+      json:
+        remarks: "Submitting for approval"
+    expect:
+      status: [200, 409]  # 200 if submitted, 409 if already submitted
+
+  # Step 5: Attempt self-approval (should fail or be rejected)
+  - name: Attempt Self-Approval (Should Fail)
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rule-versions/{gov_rule_version_id}/approve
+      auth: default  # Same user who created - should fail
+      json:
+        remarks: "Attempting self-approval (should fail)"
+    expect:
+      status: [400, 403, 409]  # Should fail with maker=checker error
+    continue_on_error: true
+
+  # Step 6: Check audit log for self-attempt
+  - name: Check Audit Log
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/audit-log
+      auth: default
+      params:
+        entity_type: "RULE_VERSION"
+        entity_id: "{gov_rule_version_id}"
+        limit: "10"
+    expect:
+      status: [200, 401]
+      json:
+        present: ["items"]
+    continue_on_error: true
+
+  # Step 7: Get approval details
+  - name: Get Approval Details
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/approvals
+      auth: default
+      params:
+        entity_id: "{gov_rule_version_id}"
+        entity_type: "RULE_VERSION"
+    expect:
+      status: [200, 401]
+      json:
+        present: ["items"]

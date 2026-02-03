@@ -1,0 +1,63 @@
+# Rule Field CRUD Tests
+# Tests creating, reading, updating, and deleting rule fields.
+# All operations are idempotent - safe to run multiple times.
+category: rule_fields
+name: Rule Field CRUD
+description: Create, read, update, and delete rule fields with idempotency
+tags: [crud, rule_fields, idempotent]
+enabled: true
+idempotency_prefix: rule_field_crud
+
+steps:
+  # Step 1: Create a test rule field (idempotent - handles 409 conflict)
+  - name: Create Test Rule Field
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rule-fields
+      auth: default
+      json:
+        field_key: "test_amount_field"
+        display_name: "Test Amount Field"
+        data_type: "NUMBER"
+        allowed_operators: ["GT", "LT", "EQ", "GTE", "LTE"]
+        multi_value_allowed: false
+        is_sensitive: false
+    expect:
+      status: [201, 409]  # 201 = created, 409 = already exists (idempotent)
+      json:
+        present: ["field_key"]
+    on_conflict:
+      # If 409, fetch the existing field
+      fetch: "GET /api/v1/rule-fields/test_amount_field"
+      save_from: "$.field_key"
+      skip: true  # Skip the step if conflict (field already exists)
+    save:
+      - name: field_key
+        json_path: "$.field_key"
+        default: "test_amount_field"
+
+  # Step 2: Read the created field
+  - name: Read Test Rule Field
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/rule-fields/{field_key}
+      auth: default
+    expect:
+      status: [200, 404]  # 404 is OK if field doesn't exist yet
+    continue_on_error: true
+
+  # Step 3: List all fields (should include our test field)
+  - name: List All Rule Fields
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/rule-fields
+      auth: default
+      params:
+        limit: "100"
+    expect:
+      status: [200, 401]
+      json:
+        present: ["items", "pagination"]

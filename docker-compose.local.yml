@@ -1,0 +1,98 @@
+# Local Development Infrastructure for Card Fraud Rule Management
+#
+# RECOMMENDED: Use card-fraud-platform for shared infrastructure instead.
+#   cd ../card-fraud-platform && uv run platform-up
+#
+# This compose file is kept as a FALLBACK for standalone development.
+# Container names match the shared platform so scripts work with either.
+#
+# Usage:
+#   uv run db-local-up           # Start PostgreSQL (via Doppler)
+#   uv run objstore-local-up     # Start MinIO (via Doppler)
+#   uv run infra-local-up        # Start both (via Doppler)
+#
+# Direct docker compose:
+#   docker compose -f docker-compose.local.yml up -d    # Start all
+#   docker compose -f docker-compose.local.yml down     # Stop
+#   docker compose -f docker-compose.local.yml down -v  # Stop and remove data
+#
+# Connection strings (set in Doppler 'local' config):
+#   DATABASE_URL_ADMIN=postgresql://postgres:${POSTGRES_ADMIN_PASSWORD}@localhost:5432/fraud_gov
+#   DATABASE_URL_APP=postgresql://fraud_gov_app_user:${FRAUD_GOV_APP_PASSWORD}@localhost:5432/fraud_gov
+#   S3_ENDPOINT_URL=http://localhost:9000
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: card-fraud-postgres
+    environment:
+      POSTGRES_DB: fraud_gov
+      POSTGRES_USER: postgres
+      POSTGRES_ADMIN_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - fraud_gov_data:/var/lib/postgresql
+    networks:
+      - card-fraud-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fraud_gov"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: card-fraud-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    networks:
+      - card-fraud-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/ready || wget -q -O - http://localhost:9000/minio/health/ready || nc -z localhost 9000"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  minio-mc-init:
+    image: minio/mc:latest
+    container_name: card-fraud-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-fraud-gov-artifacts}
+    entrypoint: ["sh", "-c"]
+    command: >
+      "
+      echo 'Configuring MinIO client...' &&
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+      echo 'Creating bucket...' &&
+      mc mb --ignore-existing local/$$S3_BUCKET_NAME &&
+      echo 'Setting bucket policy to private...' &&
+      mc anonymous set none local/$$S3_BUCKET_NAME || true &&
+      echo 'MinIO initialization complete!' &&
+      echo 'Bucket $$S3_BUCKET_NAME is ready for use.'
+      "
+    networks:
+      - card-fraud-network
+    restart: "no"
+
+volumes:
+  fraud_gov_data:
+  minio_data:
+
+networks:
+  card-fraud-network:
+    name: card-fraud-network
+    driver: bridge

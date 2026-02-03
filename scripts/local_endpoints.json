@@ -1,0 +1,152 @@
+[
+  {
+    "name": "health",
+    "method": "GET",
+    "path": "/api/v1/health",
+    "expected_status": 200
+  },
+  {
+    "name": "readyz",
+    "method": "GET",
+    "path": "/api/v1/readyz",
+    "expected_status": [200, 503]
+  },
+  {
+    "name": "list_rule_fields_unauth",
+    "method": "GET",
+    "path": "/api/v1/rule-fields",
+    "expected_status": [401, 403]
+  },
+  {
+    "name": "list_rule_fields_auth",
+    "method": "GET",
+    "path": "/api/v1/rule-fields",
+    "expected_status": 200,
+    "auth": "user"
+  },
+  {
+    "name": "get_rule_field_missing_auth",
+    "method": "GET",
+    "path": "/api/v1/rule-fields/00000000-0000-0000-0000-000000000000",
+    "expected_status": 404,
+    "auth": "user"
+  },
+  {
+    "name": "create_rule_field_unauth",
+    "method": "POST",
+    "path": "/api/v1/rule-fields",
+    "json": { "key": "test_field", "name": "Test Field", "data_type": "string" },
+    "expected_status": [401, 403]
+  },
+  {
+    "name": "list_rules",
+    "method": "GET",
+    "path": "/api/v1/rules",
+    "expected_status": 200
+  },
+  {
+    "name": "get_rule_missing",
+    "method": "GET",
+    "path": "/api/v1/rules/00000000-0000-0000-0000-000000000000",
+    "expected_status": 404
+  },
+  {
+    "name": "list_rulesets",
+    "method": "GET",
+    "path": "/api/v1/rulesets",
+    "expected_status": 200
+  },
+  {
+    "name": "get_ruleset_missing",
+    "method": "GET",
+    "path": "/api/v1/rulesets/00000000-0000-0000-0000-000000000000",
+    "expected_status": 404
+  },
+  {
+    "name": "list_approvals",
+    "method": "GET",
+    "path": "/api/v1/approvals",
+    "expected_status": 200
+  },
+  {
+    "name": "list_audit_logs",
+    "method": "GET",
+    "path": "/api/v1/audit-log",
+    "expected_status": 200
+  },
+  {
+    "name": "audit_log_bad_date",
+    "method": "GET",
+    "path": "/api/v1/audit-log?since=not-a-date",
+    "expected_status": 422
+  },
+  {
+    "name": "list_rule_fields_active",
+    "method": "GET",
+    "path": "/api/v1/rule-fields?is_active=true",
+    "expected_status": 200,
+    "auth": "user"
+  },
+  {
+    "name": "get_field_metadata_missing",
+    "method": "GET",
+    "path": "/api/v1/rule-fields/nonexistent/metadata",
+    "expected_status": 404,
+    "auth": "user"
+  },
+  {
+    "name": "get_specific_metadata_missing",
+    "method": "GET",
+    "path": "/api/v1/rule-fields/nonexistent/metadata/velocity",
+    "expected_status": 404,
+    "auth": "user"
+  },
+  {
+    "name": "audit_log_limit",
+    "method": "GET",
+    "path": "/api/v1/audit-log?limit=5",
+    "expected_status": 200
+  },
+  {
+    "name": "create_rule_unauth",
+    "method": "POST",
+    "path": "/api/v1/rules",
+    "json": { "rule_name": "Test Rule", "description": "x", "rule_type": "ALLOWLIST", "condition_tree": {"type":"CONDITION","field":"amount","operator":"GT","value":1}, "priority": 100 },
+    "expected_status": [401, 403]
+  },
+
+  {
+    "name": "create_local_field",
+    "method": "POST",
+    "path": "/api/v1/rule-fields",
+    "json": {
+      "field_key": "local_field_{run_id}",
+      "display_name": "Local Field {run_id}",
+      "data_type": "STRING",
+      "allowed_operators": ["EQ"],
+      "multi_value_allowed": false,
+      "is_sensitive": false,
+      "is_active": true
+    },
+    "expected_status": [201, 409],
+    "auth": "admin",
+    "save": { "name": "field_key", "json_path": "field_key" },
+    "optional": true
+  },
+  {
+    "name": "verify_local_field",
+    "method": "GET",
+    "path": "/api/v1/rule-fields/{field_key}",
+    "expected_status": 200,
+    "auth": "user"
+  },
+  {
+    "name": "deactivate_local_field",
+    "method": "PATCH",
+    "path": "/api/v1/rule-fields/{field_key}",
+    "json": { "is_active": false },
+    "expected_status": 200,
+    "auth": "admin",
+    "teardown": { "method": "PATCH", "path": "/api/v1/rule-fields/{field_key}", "auth": "admin", "json": { "is_active": false } }
+  }
+]

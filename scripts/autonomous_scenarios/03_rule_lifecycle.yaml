@@ -1,0 +1,111 @@
+# Rule Lifecycle Tests
+# Tests the complete lifecycle of a rule:
+# 1. Create rule identity
+# 2. Create rule version
+# 3. Submit for approval
+# 4. Approve (or skip if already approved)
+category: rules
+name: Rule Lifecycle
+description: Complete rule lifecycle from creation to approval
+tags: [rules, lifecycle, governance, maker-checker]
+enabled: true
+idempotency_prefix: rule_lifecycle
+
+steps:
+  # Step 1: Create a rule identity (idempotent)
+  - name: Create Rule Identity
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rules
+      auth: default
+      json:
+        rule_name: "Test High Value Transaction"
+        description: "Flag transactions over $10,000"
+        rule_type: "AUTH"
+    expect:
+      status: [201, 409]  # 409 if rule with same name exists
+      json:
+        present: ["rule_id", "rule_name", "status"]
+    save:
+      - name: rule_id
+        json_path: "$.rule_id"
+    on_conflict:
+      # If 409, try to fetch existing rule by name
+      fetch: "GET /api/v1/rules?rule_name=Test%20High%20Value%20Transaction"
+      save_from: "$.items[0].rule_id"
+
+  # Step 2: Create a rule version (idempotent)
+  - name: Create Rule Version
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rules/{rule_id}/versions
+      auth: default
+      json:
+        condition_tree:
+          logicalOperator: "AND"
+          conditions:
+            - field: "amount"
+              operator: "GT"
+              value: 10000
+        priority: 100
+        scope: {}
+    expect:
+      status: [201, 400, 409]  # 400 if already has draft version
+      json:
+        present: ["rule_version_id", "version"]
+    save:
+      - name: rule_version_id
+        json_path: "$.rule_version_id"
+      - name: rule_version_number
+        json_path: "$.version"
+    continue_on_error: true  # May fail if draft version exists
+
+  # Step 3: Submit rule version for approval (skip if not DRAFT)
+  - name: Submit Rule Version for Approval
+    idempotent: true
+    skip_if:
+      db_query: "SELECT status FROM fraud_gov.rule_versions WHERE rule_version_id = :id"
+      condition: "status NOT IN ('DRAFT', 'REJECTED')"
+    request:
+      method: POST
+      path: /api/v1/rule-versions/{rule_version_id}/submit
+      auth: default
+      json:
+        idempotency_key: "{idempotency_prefix}_submit_{rule_version_id}"
+    expect:
+      status: [200, 409, 400]  # 400 if not in DRAFT state
+    continue_on_error: true
+
+  # Step 4: Approve rule version (skip if already APPROVED)
+  # Note: This requires a different user (checker) than the maker
+  - name: Approve Rule Version
+    idempotent: true
+    skip_if:
+      db_query: "SELECT status FROM fraud_gov.rule_versions WHERE rule_version_id = :id"
+      condition: "status = 'APPROVED'"
+    request:
+      method: POST
+      path: /api/v1/rule-versions/{rule_version_id}/approve
+      auth: default  # TODO: Should be checker role
+      json:
+        idempotency_key: "{idempotency_prefix}_approve_{rule_version_id}"
+    expect:
+      status: [200, 409, 400]  # May fail if maker=checker
+    db_assert:
+      - query: "SELECT status FROM fraud_gov.rule_versions WHERE rule_version_id = :id"
+        expect: "APPROVED"
+    continue_on_error: true  # May fail due to maker-checker violation
+
+  # Step 5: Get rule details
+  - name: Get Rule Details
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/rules/{rule_id}
+      auth: default
+    expect:
+      status: [200, 404]
+      json:
+        present: ["rule_id", "rule_name", "current_version"]

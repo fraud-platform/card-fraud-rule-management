@@ -1,0 +1,184 @@
+# Doppler Secrets Template
+#
+# This file documents all REQUIRED secrets for the card-fraud-governance-api project.
+# Use this as a reference when setting up Doppler environments.
+#
+# Setup Instructions:
+# 1. Run: doppler setup
+# 2. Add secrets via Doppler dashboard: https://dashboard.doppler.com
+# 3. Verify: .\scripts\doppler-setup.ps1 verify <env>
+#
+# Environment Mappings:
+#   local  → Local development (your machine)
+#   test   → Test environment (CI/staging)
+#   prod   → Production
+#
+# ============================================================================
+# WHAT GOES IN DOPPLER vs HARD CODED
+# ============================================================================
+#
+# IN DOPPLER (secrets + per-environment values):
+#   - Database credentials (passwords)
+#   - API tokens (METRICS_TOKEN)
+#   - Client secrets (AUTH0_CLIENT_SECRET)
+#   - Per-environment config (APP_ENV, APP_REGION, CORS_ORIGINS)
+#
+# HARD CODED in app/core/config.py (defaults, not secrets):
+#   - AUTH0_ALGORITHMS = "RS256" (default)
+#   - ALGORITHM = "HS256" (default, not currently used)
+#   - OBSERVABILITY_ENABLED = True (default)
+#   - OBSERVABILITY_STRUCTURED_LOGS = True (default)
+#   - APP_NAME = "fraud-governance-api" (constant)
+#   - SECRET_KEY (placeholder validated but not used - RS256 used instead)
+#
+# ============================================================================
+# SECRETS TEMPLATE
+# ============================================================================
+
+# ============================================================================
+# APPLICATION CONFIG (Per-environment, not secret)
+# ============================================================================
+
+APP_ENV:
+  description: Application environment
+  local: local
+  test: test
+  prod: production
+  required: true
+
+APP_REGION:
+  description: Geographic region for deployment
+  example: india, us-east-1, ap-southeast-1
+  required: true
+  notes: |
+    - This identifies which region's database this app connects to
+    - Future: One app instance + one DB per region
+    - Valid formats: country names (india) or cloud regions (us-east-1)
+
+# ============================================================================
+# DATABASE (SECRET - only password part)
+# ============================================================================
+
+DATABASE_URL_APP:
+  description: PostgreSQL connection string (ENTIRE URL goes in Doppler)
+  format: postgresql://user:PASSWORD@host:port/database?sslmode=require
+  example: postgresql://fraud_gov_app_user:mypassword@ep-xxx.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+  required: true
+  notes: |
+    - Even though only the password is secret, put the ENTIRE URL in Doppler
+    - This makes it easy to manage per-environment database connections
+    - Production must have sslmode=require
+
+# ============================================================================
+# AUTH0 CONFIGURATION
+# ============================================================================
+
+AUTH0_DOMAIN:
+  description: Auth0 tenant domain (not secret, but per-environment)
+  example: your-tenant.auth0.com
+  required: true
+
+AUTH0_AUDIENCE:
+  description: Auth0 API identifier (not secret, but per-environment)
+  example: https://fraud-governance-api
+  required: true
+
+# Auth0 M2M credentials (SECRET - for test-token generation)
+AUTH0_CLIENT_ID:
+  description: Auth0 Machine-to-Machine application client ID (not secret, but per-environment)
+  required: true
+
+AUTH0_CLIENT_SECRET:
+  description: Auth0 Machine-to-Machine client secret (SECRET!)
+  required: true
+
+# NOT IN DOPPLER (hardcoded default):
+#   AUTH0_ALGORITHMS = "RS256"  (RS256 uses Auth0's public keys, no shared secret)
+
+# ============================================================================
+# METRICS PROTECTION (SECRET)
+# ============================================================================
+
+METRICS_TOKEN:
+  description: Token for protecting /metrics endpoint (SECRET!)
+  generation: python -c "import secrets; print(secrets.token_urlsafe(32))"
+  required: true
+  notes: |
+    - Required to access /metrics endpoint
+    - Generate different token for each environment
+
+# ============================================================================
+# CORS CONFIGURATION (Per-environment, not secret)
+# ============================================================================
+
+CORS_ORIGINS:
+  description: Allowed origins for CORS (comma-separated, per-environment)
+  local: http://localhost:3000,http://localhost:5173
+  test: https://test-frontend.your-domain.com
+  prod: https://your-frontend-domain.com
+  required: true
+  notes: |
+    - NEVER include localhost in production
+    - Separate multiple origins with commas
+    - Must include the protocol (https://)
+
+# ============================================================================
+# NOT IN DOPPLER (Hardcoded Defaults)
+# ============================================================================
+#
+# These are in app/core/config.py with default values:
+#
+#   APP_NAME = "fraud-governance-api"         # Constant
+#   APP_LOG_LEVEL = "INFO"                    # Default
+#   AUTH0_ALGORITHMS = "RS256"                # Default
+#   ALGORITHM = "HS256"                       # Default (not currently used)
+#   SECRET_KEY (placeholder validated)         # Not used - app uses Auth0 RS256
+#   OBSERVABILITY_ENABLED = True              # Default
+#   OBSERVABILITY_STRUCTURED_LOGS = True      # Default
+#   OBSERVABILITY_REQUEST_ID_HEADER = "X-Request-ID"  # Constant
+#
+# ============================================================================
+# NOTES
+# ============================================================================
+#
+# Your Current Environment (.env / .env.test):
+#
+#   APP_ENV=dev/test                    → Doppler: APP_ENV
+#   APP_REGION=india                    → Doppler: APP_REGION
+#   DATABASE_URL_APP (entire URL)       → Doppler: DATABASE_URL_APP
+#   AUTH0_DOMAIN                        → Doppler: AUTH0_DOMAIN
+#   AUTH0_AUDIENCE                      → Doppler: AUTH0_AUDIENCE
+#   AUTH0_ALGORITHMS=RS256              → Skip (hardcoded default)
+#   AUTH0_CLIENT_ID                     → Doppler: AUTH0_CLIENT_ID
+#   AUTH0_CLIENT_SECRET                 → Doppler: AUTH0_CLIENT_SECRET (SECRET!)
+#   SECRET_KEY=...                      → Skip (placeholder, not used)
+#   ALGORITHM=HS256                     → Skip (hardcoded default)
+#   ACCESS_TOKEN_EXPIRE_MINUTES=30      → Skip (hardcoded default)
+#   CORS_ORIGINS                         → Doppler: CORS_ORIGINS
+#   OBSERVABILITY_ENABLED=true           → Skip (hardcoded default)
+#   OBSERVABILITY_STRUCTURED_LOGS=true  → Skip (hardcoded default)
+#
+# Minimum Required in Doppler:
+#
+#   local/test:
+#     - APP_ENV
+#     - APP_REGION
+#     - DATABASE_URL_APP (entire URL)
+#     - AUTH0_DOMAIN
+#     - AUTH0_AUDIENCE
+#     - AUTH0_CLIENT_ID
+#     - AUTH0_CLIENT_SECRET
+#     - CORS_ORIGINS
+#     - METRICS_TOKEN (optional for local, required for prod)
+#
+#   prod:
+#     - APP_ENV=production
+#     - APP_REGION
+#     - DATABASE_URL_APP (entire URL with sslmode=require)
+#     - AUTH0_DOMAIN
+#     - AUTH0_AUDIENCE
+#     - AUTH0_CLIENT_ID
+#     - AUTH0_CLIENT_SECRET
+#     - METRICS_TOKEN (required!)
+#     - CORS_ORIGINS (NO localhost!)
+#

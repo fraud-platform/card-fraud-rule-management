@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# uv
+.venv/
+!uv.lock
+
+# Environment
+.env
+.env.*
+
+# Testing
+tests/
+htmlcov/
+htmlreports/
+.coverage
+coverage.xml
+.pytest_cache/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Development
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Database
+db/
+*.sql
+!db/fraud_governance_schema.sql
+
+# Scripts
+scripts/
+cli/
+
+# OS
+.DS_Store
+Thumbs.db

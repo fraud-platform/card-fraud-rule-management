@@ -1,0 +1,160 @@
+# RuleSet v1 Lifecycle Tests - Fully Idempotent
+# Tests the new v1 schema workflow with full idempotency:
+# 1. Create RuleSet identity (handles existing)
+# 2. Create rule + version (handles existing)
+# 3. Create RuleSet version (handles existing)
+# 4. Submit for approval
+# 5. Try approve (maker=checker prevents it - expected)
+# 6. Get details
+category: ruleset
+name: RuleSet v1 Lifecycle
+description: Complete RuleSet v1 workflow - fully idempotent for rinse/repeat
+tags: [ruleset, v1, lifecycle, governance]
+enabled: true
+idempotency_prefix: ruleset_v1_lifecycle
+
+steps:
+  # Step 1: Create RuleSet identity (idempotent - handles 409)
+  - name: Create RuleSet Identity
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rulesets
+      auth: default
+      json:
+        environment: "local"
+        region: "TEST"
+        country: "XX"
+        rule_type: "AUTH"
+        name: "Local Test AUTH RuleSet"
+        description: "Test ruleset for autonomous testing"
+    expect:
+      status: [201, 409]
+      json:
+        present: ["ruleset_id"]
+    save:
+      - name: ruleset_id
+        json_path: "$.ruleset_id"
+    on_conflict:
+      fetch: "GET /api/v1/rulesets?environment=local&region=TEST&country=XX&rule_type=AUTH"
+      save_from: "$.items[0].ruleset_id"
+
+  # Step 2: Create a rule for the ruleset (idempotent)
+  - name: Create Rule for RuleSet
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rules
+      auth: default
+      json:
+        rule_name: "Test Rule for RuleSet"
+        description: "Test rule"
+        rule_type: "AUTH"
+    expect:
+      status: [201, 409]
+      json:
+        present: ["rule_id"]
+    save:
+      - name: ruleset_rule_id
+        json_path: "$.rule_id"
+    on_conflict:
+      fetch: "GET /api/v1/rules?rule_name=Test Rule for RuleSet&rule_type=AUTH"
+      save_from: "$.items[0].rule_id"
+
+  # Step 3: Create rule version for the ruleset (idempotent with fetch)
+  - name: Create Rule Version for RuleSet
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rules/{ruleset_rule_id}/versions
+      auth: default
+      json:
+        condition_tree:
+          logicalOperator: "AND"
+          conditions:
+            - field: "amount"
+              operator: "GT"
+              value: 5000
+        priority: 100
+        scope:
+          network: ["VISA"]
+    expect:
+      status: [201, 400, 409]
+      json:
+        present: ["rule_version_id"]
+    save:
+      - name: ruleset_rule_version_id
+        json_path: "$.rule_version_id"
+    on_conflict:
+      fetch: "GET /api/v1/rules/{ruleset_rule_id}/versions"
+      save_from: "$.items[?(@.priority==100)][0].rule_version_id"
+    continue_on_error: true
+
+  # Step 4: Create RuleSet version v1 (idempotent with fetch)
+  - name: Create RuleSet Version v1
+    idempotent: true
+    request:
+      method: POST
+      path: /api/v1/rulesets/{ruleset_id}/versions
+      auth: default
+      json:
+        rule_version_ids: ["{ruleset_rule_version_id}"]
+    expect:
+      status: [201, 400, 409]
+      json:
+        present: ["ruleset_version_id", "version"]
+    save:
+      - name: ruleset_version_id
+        json_path: "$.ruleset_version_id"
+      - name: ruleset_version_number
+        json_path: "$.version"
+    on_conflict:
+      fetch: "GET /api/v1/rulesets/{ruleset_id}/versions?limit=1"
+      save_from: "$.items[0].ruleset_version_id"
+    continue_on_error: true
+
+  # Step 5: Submit RuleSet version for approval (skip if already submitted)
+  - name: Submit RuleSet Version
+    idempotent: true
+    skip_if:
+      db_query: "SELECT status FROM fraud_gov.ruleset_versions WHERE ruleset_version_id = :id"
+      condition: "status NOT IN ('DRAFT', 'REJECTED')"
+    request:
+      method: POST
+      path: /api/v1/ruleset-versions/{ruleset_version_id}/submit
+      auth: default
+      json:
+        idempotency_key: "{idempotency_prefix}_submit_{ruleset_version_id}"
+    expect:
+      status: [200, 409, 400]
+    continue_on_error: true
+
+  # Step 6: Approve RuleSet version
+  # NOTE: This test uses same token as submitter (maker=checker), so MakerCheckerViolation is EXPECTED.
+  # In production, a DIFFERENT user (checker) would approve.
+  - name: Approve RuleSet Version (Expected to Fail - Maker=Checker)
+    idempotent: true
+    skip_if:
+      db_query: "SELECT status FROM fraud_gov.ruleset_versions WHERE ruleset_version_id = :id"
+      condition: "status IN ('APPROVED', 'ACTIVE', 'SUPERSEDED')"
+    request:
+      method: POST
+      path: /api/v1/ruleset-versions/{ruleset_version_id}/approve
+      auth: default
+      json:
+        idempotency_key: "{idempotency_prefix}_approve_{ruleset_version_id}"
+    expect:
+      status: [409, 200]  # 409 = MakerCheckerViolation (expected), 200 = already approved
+    continue_on_error: true
+
+  # Step 7: Get RuleSet version details
+  - name: Get RuleSet Version Details
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/ruleset-versions/{ruleset_version_id}
+      auth: default
+    expect:
+      status: [200, 404]
+      json:
+        present: ["ruleset_version_id", "status", "version"]

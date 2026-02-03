@@ -1,0 +1,57 @@
+# Smoke Tests - Basic API Health Checks
+# These tests verify the API is responsive and basic endpoints work.
+category: smoke
+name: Smoke Tests
+description: Basic health and connectivity checks
+tags: [smoke, health, basic]
+enabled: true
+idempotency_prefix: smoke
+
+steps:
+  # Step 1: Health check (no auth required)
+  - name: Health Check
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/health
+      auth: none
+    expect:
+      status: 200
+      json:
+        present: ["status"]
+
+  # Step 2: List rule fields (requires auth, but returns empty list is OK)
+  - name: List Rule Fields (Empty)
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/rule-fields
+      auth: default
+    expect:
+      status: [200, 401]  # 401 if auth not configured
+      json:
+        present: ["items"]  # May be empty array
+
+  # Step 3: List rules (empty is OK)
+  - name: List Rules (Empty)
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/rules
+      auth: default
+    expect:
+      status: [200, 401]
+      json:
+        present: ["items"]
+
+  # Step 4: List rulesets (empty is OK)
+  - name: List RuleSets (Empty)
+    idempotent: true
+    request:
+      method: GET
+      path: /api/v1/rulesets
+      auth: default
+    expect:
+      status: [200, 401]
+      json:
+        present: ["items"]

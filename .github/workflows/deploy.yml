@@ -1,0 +1,369 @@
+# Continuous Deployment workflow for Fraud Rule Management
+#
+# Triggers:
+#   - Push to main branch (production)
+#   - Push to develop branch (staging)
+#   - Manual workflow dispatch
+#
+# Jobs:
+#   - build-and-push: Build Docker image and push to GHCR
+#   - deploy-staging: Deploy to staging environment
+#   - deploy-production: Deploy to production environment
+#
+# Choreo Integration:
+#   - Uses Choreo CLI to trigger deployments
+#   - Requires CHOREO_PROJECT_ID and CHOREO_TOKEN secrets
+#   - Auto-deploys via Choreo's GitHub integration (no manual trigger needed)
+
+name: Deploy
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  PYTHON_VERSION: "3.14"
+  UV_VERSION: "0.5"
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/fraud-rule-management
+  DOPPLER_PROJECT: card-fraud-rule-management
+
+jobs:
+  # ============================================================================
+  # Build and Push Docker Image to GHCR
+  # ============================================================================
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Print image digest
+        run: |
+          echo "Image pushed: ${{ steps.meta.outputs.tags }}"
+          echo "Digest: ${{ steps.build.outputs.digest }}"
+
+  # ============================================================================
+  # Deploy to Staging (on develop branch)
+  # ============================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://fraud-rule-management-staging.choreo.dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Doppler CLI
+        run: |
+          curl -fsSL https://cli.doppler.com/install.sh | sh
+          doppler --version
+
+      - name: Fetch staging secrets from Doppler
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_TEST }}
+        run: |
+          doppler secrets --project=${{ env.DOPPLER_PROJECT }} --config=test
+          echo "Staging secrets loaded successfully"
+
+      - name: Install Choreo CLI
+        env:
+          CHOREO_TOKEN: ${{ secrets.CHOREO_TOKEN }}
+        run: |
+          if [ -n "$CHOREO_TOKEN" ]; then
+            curl -L https://github.com/wso2/choreo-cli/releases/latest/download/choreo-cli-linux-amd64.tar.gz | tar xz
+            chmod +x choreo
+            ./choreo version
+            echo "CHOREO_CLI_INSTALLED=true" >> $GITHUB_ENV
+          else
+            echo "CHOREO_CLI_INSTALLED=false" >> $GITHUB_ENV
+            echo "CHOREO_TOKEN not set - using Choreo GitHub integration"
+          fi
+
+      - name: Deploy to Choreo (Staging)
+        if: env.CHOREO_CLI_INSTALLED == 'true'
+        env:
+          CHOREO_TOKEN: ${{ secrets.CHOREO_TOKEN }}
+          CHOREO_PROJECT_ID: ${{ secrets.CHOREO_PROJECT_ID_STAGING }}
+        run: |
+          echo "Deploying to Choreo staging via CLI..."
+          echo "Image: ${{ env.IMAGE_NAME }}:develop-${{ github.sha }}"
+
+          # Update Choreo deployment with new image
+          ./choreo apps deploy \
+            --id "$CHOREO_PROJECT_ID" \
+            --image "${{ env.IMAGE_NAME }}:develop-${{ github.sha }}"
+
+          echo "Deployment triggered successfully"
+
+      - name: Trigger Choreo GitHub Integration (Alternative)
+        if: env.CHOREO_CLI_INSTALLED != 'true'
+        run: |
+          echo "Using Choreo GitHub integration for deployment"
+          echo "Choreo will auto-deploy when Docker image is pushed to GHCR"
+          echo "Image: ${{ env.IMAGE_NAME }}:develop-${{ github.sha }}"
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 45
+
+      - name: Verify staging deployment
+        run: |
+          STAGING_URL="https://fraud-rule-management-staging.choreo.dev"
+
+          echo "Testing health endpoint..."
+          if curl -sf --max-time 30 "$STAGING_URL/api/v1/health"; then
+            echo "✓ Health check passed"
+          else
+            echo "✗ Health check failed - deployment may still be in progress"
+            exit 1
+          fi
+
+          echo "Testing readiness endpoint..."
+          if curl -sf --max-time 30 "$STAGING_URL/api/v1/readyz"; then
+            echo "✓ Readiness check passed"
+          else
+            echo "✗ Readiness check failed"
+            exit 1
+          fi
+
+          echo ""
+          echo "Staging deployment verified successfully!"
+
+  # ============================================================================
+  # Deploy to Production (on main branch, with manual approval)
+  # ============================================================================
+  deploy-production:
+    name: Deploy to Production
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://fraud-rule-management.choreo.dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Doppler CLI
+        run: |
+          curl -fsSL https://cli.doppler.com/install.sh | sh
+          doppler --version
+
+      - name: Fetch production secrets from Doppler
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PROD }}
+        run: |
+          doppler secrets --project=${{ env.DOPPLER_PROJECT }} --config=prod
+
+          doppler secrets download --project=${{ env.DOPPLER_PROJECT }} --config=prod --format=env > .env.prod
+          if grep -q "localhost" .env.prod; then
+            echo "ERROR: localhost found in production secrets!"
+            exit 1
+          fi
+          rm .env.prod
+
+          echo "Production secrets verified successfully"
+
+      - name: Install Choreo CLI
+        env:
+          CHOREO_TOKEN: ${{ secrets.CHOREO_TOKEN }}
+        run: |
+          if [ -n "$CHOREO_TOKEN" ]; then
+            curl -L https://github.com/wso2/choreo-cli/releases/latest/download/choreo-cli-linux-amd64.tar.gz | tar xz
+            chmod +x choreo
+            ./choreo version
+            echo "CHOREO_CLI_INSTALLED=true" >> $GITHUB_ENV
+          else
+            echo "CHOREO_CLI_INSTALLED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Deploy to Choreo (Production)
+        if: env.CHOREO_CLI_INSTALLED == 'true'
+        env:
+          CHOREO_TOKEN: ${{ secrets.CHOREO_TOKEN }}
+          CHOREO_PROJECT_ID: ${{ secrets.CHOREO_PROJECT_ID_PROD }}
+        run: |
+          echo "Deploying to Choreo production via CLI..."
+          echo "Image: ${{ env.IMAGE_NAME }}:main-${{ github.sha }}"
+
+          ./choreo apps deploy \
+            --id "$CHOREO_PROJECT_ID" \
+            --image "${{ env.IMAGE_NAME }}:main-${{ github.sha }}"
+
+          echo "Production deployment triggered"
+
+      - name: Trigger Choreo GitHub Integration (Alternative)
+        if: env.CHOREO_CLI_INSTALLED != 'true'
+        run: |
+          echo "Using Choreo GitHub integration for production deployment"
+          echo "Image: ${{ env.IMAGE_NAME }}:main-${{ github.sha }}"
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for production deployment to stabilize..."
+          sleep 60
+
+      - name: Verify production deployment
+        run: |
+          PROD_URL="https://fraud-rule-management.choreo.dev"
+
+          echo "Testing health endpoint..."
+          if curl -sf --max-time 30 "$PROD_URL/api/v1/health"; then
+            echo "✓ Health check passed"
+          else
+            echo "✗ Health check failed"
+            exit 1
+          fi
+
+          echo "Testing readiness endpoint..."
+          if curl -sf --max-time 30 "$PROD_URL/api/v1/readyz"; then
+            echo "✓ Readiness check passed"
+          else
+            echo "✗ Readiness check failed"
+            exit 1
+          fi
+
+          echo ""
+          echo "Production deployment verified successfully!"
+
+      - name: Run production smoke tests
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PROD }}
+        run: |
+          echo "Running production smoke tests..."
+
+          # Get Auth0 credentials from Doppler
+          AUTH0_DOMAIN=$(doppler secrets get AUTH0_DOMAIN --plain --project=${{ env.DOPPLER_PROJECT }} --config=prod)
+          AUTH0_CLIENT_ID=$(doppler secrets get AUTH0_CLIENT_ID --plain --project=${{ env.DOPPLER_PROJECT }} --config=prod)
+          AUTH0_CLIENT_SECRET=$(doppler secrets get AUTH0_CLIENT_SECRET --plain --project=${{ env.DOPPLER_PROJECT }} --config=prod)
+          AUTH0_AUDIENCE=$(doppler secrets get AUTH0_AUDIENCE --plain --project=${{ env.DOPPLER_PROJECT }} --config=prod)
+          PROD_URL="https://fraud-rule-management.choreo.dev"
+
+          # Get Auth0 token
+          echo "Fetching Auth0 token..."
+          TOKEN=$(curl -s --max-time 30 "https://$AUTH0_DOMAIN/oauth/token" \
+            -H "content-type: application/json" \
+            -d "{
+              \"client_id\":\"$AUTH0_CLIENT_ID\",
+              \"client_secret\":\"$AUTH0_CLIENT_SECRET\",
+              \"audience\":\"$AUTH0_AUDIENCE\",
+              \"grant_type\":\"client_credentials\"
+            }" | jq -r '.access_token')
+
+          if [ "$TOKEN" == "null" ] || [ -z "$TOKEN" ]; then
+            echo "✗ Failed to get Auth0 token"
+            exit 1
+          fi
+          echo "✓ Auth0 token obtained"
+
+          # Test authenticated endpoint: rule-fields
+          echo "Testing authenticated endpoint: GET /api/v1/rule-fields..."
+          if curl -sf --max-time 30 -H "Authorization: Bearer $TOKEN" \
+            "$PROD_URL/api/v1/rule-fields" | jq -e '.data' > /dev/null 2>&1; then
+            echo "✓ Authenticated endpoint test passed"
+          else
+            echo "✗ Authenticated endpoint test failed"
+            exit 1
+          fi
+
+          # Test GET /rules (list endpoint)
+          echo "Testing authenticated endpoint: GET /api/v1/rules..."
+          if curl -sf --max-time 30 -H "Authorization: Bearer $TOKEN" \
+            "$PROD_URL/api/v1/rules" | jq -e '.data' > /dev/null 2>&1; then
+            echo "✓ Rules list endpoint test passed"
+          else
+            echo "✗ Rules list endpoint test failed"
+            exit 1
+          fi
+
+          echo ""
+          echo "All production smoke tests passed!"
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "============================================"
+          echo "✓ Deployment to production successful!"
+          echo "============================================"
+          echo "Environment: production"
+          echo "URL: https://fraud-rule-management.choreo.dev"
+          echo "Image: ${{ env.IMAGE_NAME }}:main-${{ github.sha }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "============================================"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "============================================"
+          echo "✗ Deployment failed! Initiating rollback..."
+          echo "============================================"
+          echo ""
+          echo "Manual rollback required:"
+          echo "1. Go to Choreo console: https://console.choreo.dev"
+          echo "2. Navigate to fraud-rule-management project"
+          echo "3. Select previous revision and redeploy"
+          echo ""
+          echo "Or trigger rollback via Choreo CLI:"
+          echo "./choreo apps rollback --id $CHOREO_PROJECT_ID --revision <previous-revision>"
+          echo "============================================"
+          exit 1

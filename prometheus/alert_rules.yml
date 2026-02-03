@@ -1,0 +1,244 @@
+# Prometheus Alert Rules for Fraud Rule Management
+
+# Usage:
+#   - Copy this file to your Prometheus configuration directory
+#   - Or reference via prometheus.yml: rule_files: ["prometheus/alert_rules.yml"]
+
+groups:
+  # ============================================================================
+  # Infrastructure Alerts
+  # ============================================================================
+  - name: fraud-rule-management.infrastructure
+    rules:
+      # Application is down
+      - alert: ApplicationDown
+        expr: up{job="fraud-rule-management"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Application is down"
+          description: "{{ $labels.instance }} has been down for more than 2 minutes"
+          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/05-operations/runbooks.md#application-down"
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_errors_total{job="fraud-rule-management"}[5m]))
+            /
+            sum(rate(http_requests_total{job="fraud-rule-management"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes on {{ $labels.route }}"
+          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/05-operations/runbooks.md#high-error-rate"
+
+      # High latency (p95)
+      - alert: HighLatency95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="fraud-rule-management"}[5m])) by (le, route)
+          ) > 1
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "High request latency (p95)"
+          description: "p95 latency is {{ $value | humanizeDuration }} for {{ $labels.route }}"
+
+      # High latency (p99)
+      - alert: HighLatency99
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{job="fraud-rule-management"}[5m])) by (le, route)
+          ) > 5
+        for: 5m
+        labels:
+          severity: medium
+        annotations:
+          summary: "Very high request latency (p99)"
+          description: "p99 latency is {{ $value | humanizeDuration }} for {{ $labels.route }}"
+
+      # High request rate spike
+      - alert: RequestRateSpike
+        expr: |
+          sum(rate(http_requests_total{job="fraud-rule-management"}[5m])) > 100
+        for: 2m
+        labels:
+          severity: medium
+        annotations:
+          summary: "Unusual request rate spike"
+          description: "Request rate is {{ $value }}/s (expected: < 50/s)"
+
+      # Low request rate (potential outage)
+      - alert: LowRequestRate
+        expr: |
+          sum(rate(http_requests_total{job="fraud-rule-management"}[5m])) < 0.1
+        for: 10m
+        labels:
+          severity: high
+        annotations:
+          summary: "Very low request rate"
+          description: "Request rate is {{ $value }}/s (may indicate outage)"
+
+  # ============================================================================
+  # Database Alerts
+  # ============================================================================
+  - name: fraud-rule-management.database
+    rules:
+      # Database connection pool exhausted
+      - alert: DatabasePoolExhausted
+        expr: |
+          db_pool_checked_out{job="fraud-rule-management"}
+          /
+          db_pool_size{job="fraud-rule-management"} > 0.9
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value | humanizePercentage }} of pool is checked out"
+          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/05-operations/runbooks.md#database-pool-exhausted"
+
+      # Slow database queries
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(db_query_duration_seconds_bucket{job="fraud-rule-management"}[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: medium
+        annotations:
+          summary: "Slow database queries"
+          description: "p95 query latency is {{ $value | humanizeDuration }}"
+
+      # Database query errors
+      - alert: DatabaseQueryErrors
+        expr: |
+          sum(rate(db_queries_total{status="error",job="fraud-rule-management"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "Database query errors detected"
+          description: "{{ $value }} query errors per second"
+
+  # ============================================================================
+  # Security Alerts
+  # ============================================================================
+  - name: fraud-rule-management.security
+    rules:
+      # High authentication failure rate (possible attack)
+      - alert: HighAuthFailureRate
+        expr: |
+          sum(rate(http_errors_total{error_type="UnauthorizedError",job="fraud-rule-management"}[5m])) > 10
+        for: 5m
+        labels:
+          severity: medium
+        annotations:
+          summary: "High authentication failure rate"
+          description: "{{ $value }} auth failures per second for the last 5 minutes (possible attack)"
+          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/05-operations/runbooks.md#high-auth-failure-rate"
+
+      # High authorization failure rate
+      - alert: HighAuthzFailureRate
+        expr: |
+          sum(rate(http_errors_total{error_type="ForbiddenError",job="fraud-rule-management"}[5m])) > 5
+        for: 5m
+        labels:
+          severity: medium
+        annotations:
+          summary: "High authorization failure rate"
+          description: "{{ $value }} authorization failures per second"
+
+      # Rate limit violations
+      - alert: RateLimitViolations
+        expr: |
+          sum(rate_limit_violations_total{job="fraud-rule-management"}[1m]) > 100
+        for: 5m
+        labels:
+          severity: medium
+        annotations:
+          summary: "High rate limit violation rate"
+          description: "{{ $value }} rate limit violations per minute"
+
+  # ============================================================================
+  # Compiler Alerts
+  # ============================================================================
+  - name: fraud-rule-management.compiler
+    rules:
+      # Compilation failures
+      - alert: CompilerFailures
+        expr: |
+          sum(rate(compiler_compilations_total{status="error",job="fraud-rule-management"}[15m]))
+          /
+          sum(rate(compiler_compilations_total{job="fraud-rule-management"}[15m])) > 0.1
+        for: 15m
+        labels:
+          severity: high
+        annotations:
+          summary: "High compiler failure rate"
+          description: "{{ $value | humanizePercentage }} of compilations are failing"
+          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/05-operations/runbooks.md#compiler-failures"
+
+      # Slow compilation
+      - alert: SlowCompilation
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(compiler_duration_seconds_bucket{job="fraud-rule-management"}[15m])) by (le)
+          ) > 10
+        for: 15m
+        labels:
+          severity: medium
+        annotations:
+          summary: "Slow ruleset compilation"
+          description: "p95 compilation time is {{ $value | humanizeDuration }}"
+
+      # Large AST size (potential issue)
+      - alert: LargeASTSize
+        expr: |
+          compiler_ast_bytes{job="fraud-rule-management"} > 10000000
+        for: 5m
+        labels:
+          severity: medium
+        annotations:
+          summary: "Large compiled AST detected"
+          description: "AST size is {{ $value | humanizeBytes }} (may indicate overly complex ruleset)"
+
+  # ============================================================================
+  # SLO (Service Level Objective) Alerts
+  # ============================================================================
+  - name: fraud-rule-management.slo
+    rules:
+      # Availability SLO: 99.9% (max 0.1% error rate)
+      - alert: AvailabilitySLIBreached
+        expr: |
+          (
+            sum(rate(http_errors_total{job="fraud-rule-management"}[1h]))
+            /
+            sum(rate(http_requests_total{job="fraud-rule-management"}[1h]))
+          ) > 0.001
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Availability SLO breached (99.9%)"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last hour"
+
+      # Latency SLO: p95 < 1s
+      - alert: LatencySLIBreached
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="fraud-rule-management"}[1h])) by (le)
+          ) > 1
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Latency SLO breached (p95 < 1s)"
+          description: "p95 latency is {{ $value | humanizeDuration }} over the last hour"

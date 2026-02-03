@@ -1,0 +1,79 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+!env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/
+.cursor/
+.codex/
+.aider/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+htmlreports/
+.tox/
+coverage.json
+artifacts/
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+NUL
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Alembic (if used later)
+alembic/versions/*.pyc
+
+# Temporary exclusions until documentation/agent files are standardized
+docs/
+CLAUDE.md
+claude.md
+STATUS.md
+status.md
+SESSION_HANDOFF.md
