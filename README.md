@@ -52,7 +52,7 @@ uv run openapi
 - Agent instructions: `AGENTS.md`
 - Project status/changelog: `STATUS.md`
 - Auth model: `docs/AUTH_MODEL.md`
-- Auth0 setup: `docs/01-setup/AUTH0_SETUP_GUIDE.md`
+- Auth0 setup: `docs/01-setup/auth0-setup-guide.md`
 
 ## Common Commands
 

@@ -1,9 +1,20 @@
 # Setup
 
-Use this section for prerequisites and first-run setup of `card-fraud-rule-management`.
+Prerequisites, first-run onboarding, and environment bootstrap.
 
-## Baseline Commands
+## Published Files
 
-- `uv sync`
-- `uv run doppler-local`
-- `uv run doppler-local-test`
+- `auth0-setup-guide.md`
+- `clean-slate-reset.md`
+- `database-setup.md`
+- `doppler-secrets-setup.md`
+- `local-setup.md`
+- `neon-api-reference.md`
+- `new-user-setup-guide.md`
+- `s3-setup.md`
+- `verification.md`
+
+## Naming Rules
+
+- Use lowercase kebab-case for new topic docs.
+- Keep this section focused; move broad cross-cutting topics to `07-reference`.

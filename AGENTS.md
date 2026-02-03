@@ -95,7 +95,7 @@ uv run auth0-cleanup --yes --verbose
 
 Auth0 reference docs:
 - `docs/AUTH_MODEL.md`
-- `docs/01-setup/AUTH0_SETUP_GUIDE.md`
+- `docs/01-setup/auth0-setup-guide.md`
 
 ---
 

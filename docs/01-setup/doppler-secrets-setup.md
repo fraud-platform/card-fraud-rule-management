@@ -204,5 +204,5 @@ uv run db-init --yes
 ## Related Documentation
 
 - [Database Setup](database-setup.md) - Database initialization
-- [Auth0 Setup](auth0-setup.md) - Auth0 configuration
+- [Auth0 Setup](auth0-setup-guide.md) - Auth0 configuration
 - [AGENTS.md](../../AGENTS.md) - Agent instructions

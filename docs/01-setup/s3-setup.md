@@ -205,6 +205,6 @@ aws --endpoint-url http://localhost:9000 s3 ls s3://fraud-gov-artifacts --recurs
 
 ## Related docs
 
-- Database reset workflow: [docs/01-setup/CLEAN_SLATE_RESET.md](CLEAN_SLATE_RESET.md)
+- Database reset workflow: [docs/01-setup/clean-slate-reset.md](clean-slate-reset.md)
 - Database setup (canonical): [docs/01-setup/database-setup.md](database-setup.md)
 - AGENTS.md - Complete command reference for AI agents and developers

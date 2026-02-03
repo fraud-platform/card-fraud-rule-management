@@ -64,5 +64,5 @@ uv run doppler-test
 
 - DB setup: `database-setup.md`
 - Setup verification: `verification.md`
-- Auth0 setup: `AUTH0_SETUP_GUIDE.md`
+- Auth0 setup: `auth0-setup-guide.md`
 - Dev workflow: `../02-development/workflow.md`

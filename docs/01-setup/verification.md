@@ -69,5 +69,5 @@ uv run doppler-test -m e2e_integration -v
 
 - `local-setup.md`
 - `database-setup.md`
-- `AUTH0_SETUP_GUIDE.md`
+- `auth0-setup-guide.md`
 - `../02-development/workflow.md`

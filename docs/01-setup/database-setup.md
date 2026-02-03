@@ -4,7 +4,7 @@
 
 **PostgreSQL 18 with native UUIDv7 support**
 
-**Need to delete everything and start fresh?** See [CLEAN_SLATE_RESET.md](CLEAN_SLATE_RESET.md) for complete reset instructions.
+**Need to delete everything and start fresh?** See [clean-slate-reset.md](clean-slate-reset.md) for complete reset instructions.
 
 ---
 
@@ -506,7 +506,7 @@ DATABASE_URL_ANALYTICS=postgresql://fraud_gov_analytics_user:${FRAUD_GOV_ANALYTI
 
 After database setup:
 
-1. **Complete Auth0 Setup**: See [auth0-setup.md](auth0-setup.md)
+1. **Complete Auth0 Setup**: See [auth0-setup-guide.md](auth0-setup-guide.md)
 2. **Verify Complete Setup**: See [verification.md](verification.md)
 3. **Start Development**: See [../02-development/workflow.md](../02-development/workflow.md)
 

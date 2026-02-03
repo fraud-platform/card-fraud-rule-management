@@ -1,3 +1,12 @@
 # Reference
 
-Document glossary, architecture decisions, and cross-repo references.
+Architecture decisions, glossary, and cross-repo references.
+
+## Published Files
+
+- _No published topic file yet._
+
+## Naming Rules
+
+- Use lowercase kebab-case for new topic docs.
+- Keep this section focused; move broad cross-cutting topics to `07-reference`.

@@ -4,12 +4,13 @@
 
 FastAPI control-plane service for rule authoring, approvals, and artifact publishing.
 
-## Primary Areas
+## Key Paths
 
-- `app/` or `src/`: service or application implementation.
-- `tests/` or `e2e/`: automated validation.
-- `scripts/` or `cli/`: local developer tooling.
-- `docs/`: curated documentation index and section guides.
+- `app/`: FastAPI application code (routers, services, domain models).
+- `cli/`: Developer and Doppler-aware command wrappers.
+- `tests/`: Unit, smoke, and e2e integration tests.
+- `scripts/`: Operational helpers for setup and maintenance.
+- `docs/`: Curated onboarding and operational documentation.
 
 ## Local Commands
 
@@ -17,15 +18,16 @@ FastAPI control-plane service for rule authoring, approvals, and artifact publis
 - `uv run doppler-local`
 - `uv run doppler-local-test`
 
-## Test Commands
+## Local Test Commands
 
 - `uv run doppler-local-test`
-- `uv run doppler-test`
+- `uv run test`
 
 ## API Note
 
 Primary API surface is FastAPI under `/api/v1/*`.
 
-## Deployment Note
+## Platform Integration
 
-Local deployment can run standalone or via platform compose apps profile.
+- Standalone mode: run this repository using its own local commands and Doppler project config.
+- Consolidated mode: run this repository through `card-fraud-platform` compose stack for cross-service validation.
