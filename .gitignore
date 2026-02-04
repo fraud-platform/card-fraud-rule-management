@@ -1,4 +1,4 @@
-# Environment variables
+﻿# Environment variables
 .env
 .env.*
 !.env.example
@@ -75,19 +75,19 @@ docs/*
 !docs/README.md
 !docs/codemap.md
 !docs/01-setup/
-!docs/01-setup/*.md
+!docs/01-setup/*
 !docs/02-development/
-!docs/02-development/*.md
+!docs/02-development/*
 !docs/03-api/
-!docs/03-api/*.md
+!docs/03-api/*
 !docs/04-testing/
-!docs/04-testing/*.md
+!docs/04-testing/*
 !docs/05-deployment/
-!docs/05-deployment/*.md
+!docs/05-deployment/*
 !docs/06-operations/
-!docs/06-operations/*.md
+!docs/06-operations/*
 !docs/07-reference/
-!docs/07-reference/*.md
+!docs/07-reference/*
 
 # Never publish archived/temporary planning docs
 docs/archive/
@@ -104,3 +104,4 @@ SESSION_HANDOFF.md
 
 # Local planning docs (not for remote)
 TODO.md
+

@@ -429,8 +429,8 @@ uv run uvicorn app.main:app --port 8001
 Once setup is complete:
 
 1. **Read the Architecture Documentation** [`docs/02-development/architecture.md`](../02-development/architecture.md)
-2. **Explore the API** [`docs/04-api/reference.md`](../04-api/reference.md)
-3. **Understand the Domain Model** [`docs/reference/domain-model.md`](../reference/domain-model.md)
+2. **Explore the API** [`docs/03-api/reference.md`](../03-api/reference.md)
+3. **Understand the Domain Model** [`docs/07-reference/domain-model.md`](../07-reference/domain-model.md)
 
 ## Common Commands
 
@@ -466,7 +466,7 @@ uv run openapi                  # Regenerate OpenAPI spec
 If you're stuck:
 
 1. **Check the documentation:** [`docs/README.md`](../README.md)
-2. **Review troubleshooting:** [`docs/03-deployment/troubleshooting.md`](../03-deployment/troubleshooting.md)
+2. **Review troubleshooting:** [`docs/05-deployment/troubleshooting.md`](../05-deployment/troubleshooting.md)
 3. **Ask the team:** Create an issue or contact your team lead
 
 ## Summary

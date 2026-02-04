@@ -43,7 +43,7 @@ uv run infra-local-down
 1. Make the change.
 2. Add or update tests.
 3. Run `uv run doppler-local-test`.
-4. If API changed, run `uv run openapi` and review `docs/openapi.json` diff.
+4. If API changed, run `uv run openapi` and review `docs/03-api/openapi.json` diff.
 5. Update docs (`README.md`, `docs/README.md`, relevant topic docs).
 6. Update `STATUS.md`.
 
@@ -64,5 +64,5 @@ uv run infra-local-down
 
 - `architecture.md`
 - `compiler.md`
-- `../04-api/reference.md`
+- `../03-api/reference.md`
 - `../01-setup/database-setup.md`

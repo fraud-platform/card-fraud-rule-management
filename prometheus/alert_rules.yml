@@ -19,7 +19,7 @@ groups:
         annotations:
           summary: "Application is down"
           description: "{{ $labels.instance }} has been down for more than 2 minutes"
-          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/05-operations/runbooks.md#application-down"
+          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/06-operations/runbooks.md#application-down"
 
       # High error rate
       - alert: HighErrorRate
@@ -35,7 +35,7 @@ groups:
         annotations:
           summary: "High error rate detected"
           description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes on {{ $labels.route }}"
-          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/05-operations/runbooks.md#high-error-rate"
+          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/06-operations/runbooks.md#high-error-rate"
 
       # High latency (p95)
       - alert: HighLatency95
@@ -102,7 +102,7 @@ groups:
         annotations:
           summary: "Database connection pool nearly exhausted"
           description: "{{ $value | humanizePercentage }} of pool is checked out"
-          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/05-operations/runbooks.md#database-pool-exhausted"
+          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/06-operations/runbooks.md#database-pool-exhausted"
 
       # Slow database queries
       - alert: SlowDatabaseQueries
@@ -143,7 +143,7 @@ groups:
         annotations:
           summary: "High authentication failure rate"
           description: "{{ $value }} auth failures per second for the last 5 minutes (possible attack)"
-          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/05-operations/runbooks.md#high-auth-failure-rate"
+          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/06-operations/runbooks.md#high-auth-failure-rate"
 
       # High authorization failure rate
       - alert: HighAuthzFailureRate
@@ -184,7 +184,7 @@ groups:
         annotations:
           summary: "High compiler failure rate"
           description: "{{ $value | humanizePercentage }} of compilations are failing"
-          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/05-operations/runbooks.md#compiler-failures"
+          runbook_url: "https://github.com/your-org/card-fraud-rule-management/blob/main/docs/06-operations/runbooks.md#compiler-failures"
 
       # Slow compilation
       - alert: SlowCompilation

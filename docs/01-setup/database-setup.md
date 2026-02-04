@@ -1,6 +1,6 @@
 # Database Setup Guide
 
-**This is the single source of truth for all database setup.** See [Neon API Reference](neon-api-reference.md) for API documentation or [Doppler Secrets Setup](../03-deployment/doppler-secrets-setup.md) for secrets management.
+**This is the single source of truth for all database setup.** See [Neon API Reference](neon-api-reference.md) for API documentation or [Doppler Secrets Setup](../05-deployment/doppler-secrets-setup.md) for secrets management.
 
 **PostgreSQL 18 with native UUIDv7 support**
 
@@ -515,7 +515,7 @@ After database setup:
 ## Additional Resources
 
 - **Neon API Reference**: [neon-api-reference.md](neon-api-reference.md)
-- **Doppler Secrets**: [../03-deployment/doppler-secrets-setup.md](../03-deployment/doppler-secrets-setup.md)
+- **Doppler Secrets**: [../05-deployment/doppler-secrets-setup.md](../05-deployment/doppler-secrets-setup.md)
 - **Neon Documentation**: https://neon.tech/docs
 - **PostgreSQL Documentation**: https://www.postgresql.org/docs
 - **psycopg v3 Documentation**: https://www.psycopg.org/psycopg3/

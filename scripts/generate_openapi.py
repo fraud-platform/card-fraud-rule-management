@@ -19,7 +19,7 @@ from app.main import create_app
 
 
 def main():
-    """Generate OpenAPI JSON and save to docs/openapi.json."""
+    """Generate OpenAPI JSON and save to docs/03-api/openapi.json."""
     app = create_app()
     openapi_schema = app.openapi()
 

@@ -166,7 +166,7 @@ If you are working on (or testing) **ruleset artifact publishing** (S3-compatibl
 
 MinIO is local-only infrastructure (Docker). It does not require creating any external account.
 
-See: [docs/01-setup/s3-setup.md](s3-setup.md)
+See: [docs/../01-setup/s3-setup.md](s3-setup.md)
 
 ---
 

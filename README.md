@@ -43,15 +43,14 @@ uv run openapi
 ## API
 
 - Swagger UI: `http://127.0.0.1:8000/docs`
-- OpenAPI spec: `docs/openapi.json` (generated)
-- Human API guide: `docs/04-api/reference.md`
+- OpenAPI spec: `docs/03-api/openapi.json` (generated)
+- Human API guide: `docs/03-api/reference.md`
 
 ## Documentation
 
 - Docs index: `docs/README.md`
 - Agent instructions: `AGENTS.md`
-- Project status/changelog: `STATUS.md`
-- Auth model: `docs/AUTH_MODEL.md`
+- Auth model: `docs/07-reference/auth-model.md`
 - Auth0 setup: `docs/01-setup/auth0-setup-guide.md`
 
 ## Common Commands

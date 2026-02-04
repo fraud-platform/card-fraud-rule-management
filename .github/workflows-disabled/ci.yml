@@ -147,10 +147,10 @@ jobs:
 
       - name: Check for uncommitted changes
         run: |
-          if git diff --quiet docs/openapi.json; then
+          if git diff --quiet docs/03-api/openapi.json; then
             echo "OpenAPI spec is up to date"
           else
             echo "ERROR: OpenAPI spec is out of date. Run 'uv run openapi' and commit."
-            git diff docs/openapi.json
+            git diff docs/03-api/openapi.json
             exit 1
           fi

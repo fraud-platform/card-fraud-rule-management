@@ -198,7 +198,7 @@ class OpenApiValidator:
         """Load OpenAPI specification from file."""
         if not self.openapi_path:
             # Try default location
-            default_path = Path("docs/openapi.json")
+            default_path = Path("docs/03-api/openapi.json")
             if default_path.exists():
                 self.openapi_path = str(default_path)
             else:

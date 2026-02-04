@@ -1,12 +1,17 @@
 # API
 
-Contracts, schemas, endpoint examples, and integration notes.
+Contracts, schemas, endpoint references, and integration notes.
 
 ## Published Files
 
-- _No published topic file yet._
+- `api.md`
+- `openapi.json`
+- `pagination.md`
+- `reference.md`
+- `ruleset-publisher.md`
+- `ui-integration.md`
 
 ## Naming Rules
 
 - Use lowercase kebab-case for new topic docs.
-- Keep this section focused; move broad cross-cutting topics to `07-reference`.
+- Keep each section focused on the section purpose.

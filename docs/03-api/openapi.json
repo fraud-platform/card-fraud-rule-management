@@ -1,0 +1,4570 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Fraud Governance API",
+    "description": "Fraud rule governance and compilation control-plane",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "description": "Basic health check endpoint (public unless HEALTH_TOKEN is set).",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Api V1 Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/readyz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readyz",
+        "description": "Readiness probe: verifies database connectivity.\n\nReturns:\n  - 200 when DB is reachable\n  - 503 when DB is unavailable\n\nNote: Public unless HEALTH_TOKEN is set. For production, consider setting\nHEALTH_TOKEN to prevent reconnaissance of database availability.",
+        "operationId": "readyz_api_v1_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rule-fields": {
+      "get": {
+        "tags": [
+          "Rule Fields"
+        ],
+        "summary": "List all rule fields",
+        "description": "Retrieve all rule fields ordered by field_id.\n\n    Rule fields define the available dimensions that can be used in fraud rules.\n    Examples: mcc, amount, merchant_id, velocity_txn_count_10m_by_card\n\n    **Authentication:**\n    - Requires valid JWT token\n    - No specific role required (authenticated users can read)",
+        "operationId": "list_rule_fields_api_v1_rule_fields_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleFieldResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Rule Fields Api V1 Rule Fields Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Rule Fields"
+        ],
+        "summary": "Create a new rule field",
+        "description": "Create a new rule field definition.\n\n    Rule fields are the building blocks for fraud rules - they define what dimensions\n    can be used in rule conditions.\n\n    **Request Body:**\n    - `field_key`: Unique identifier (lowercase, snake_case, immutable after creation)\n    - `display_name`: Human-readable name\n    - `data_type`: Data type (STRING, NUMBER, BOOLEAN, DATE, ENUM)\n    - `allowed_operators`: List of permitted operators for this field\n    - `multi_value_allowed`: Whether field can have multiple values\n    - `is_sensitive`: Whether field contains PII/sensitive data\n    - `is_active`: Whether field is currently usable in rules\n\n    **Authentication:**\n    - Requires valid JWT token with `rule_field:create` permission\n\n    **Errors:**\n    - 409 Conflict: If field_key already exists\n    - 403 Forbidden: If user lacks required permission\n\n    **Audit:**\n    - Creates audit log entry with action=CREATE",
+        "operationId": "create_rule_field_api_v1_rule_fields_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleFieldCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleFieldResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/rule-fields/{field_key}": {
+      "get": {
+        "tags": [
+          "Rule Fields"
+        ],
+        "summary": "Get a specific rule field",
+        "description": "Retrieve a single rule field by its unique key.\n\n    **Path Parameters:**\n    - `field_key`: Unique identifier for the field (e.g., \"mcc\", \"amount\")\n\n    **Authentication:**\n    - Requires valid JWT token\n    - No specific role required (authenticated users can read)\n\n    **Errors:**\n    - 404 Not Found: If the field_key does not exist",
+        "operationId": "get_rule_field_api_v1_rule_fields__field_key__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "field_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Unique field identifier",
+              "title": "Field Key"
+            },
+            "description": "Unique field identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleFieldResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Rule Fields"
+        ],
+        "summary": "Update a rule field",
+        "description": "Partially update an existing rule field.\n\n    Only the provided fields will be updated; omitted fields remain unchanged.\n    The `field_key` is immutable and cannot be changed.\n\n    **Path Parameters:**\n    - `field_key`: Unique identifier of the field to update\n\n    **Request Body:**\n    - All fields are optional (partial update)\n    - Commonly updated: `is_active`, `display_name`, `allowed_operators`\n\n    **Authentication:**\n    - Requires valid JWT token with `rule_field:update` permission\n\n    **Errors:**\n    - 404 Not Found: If field_key does not exist\n    - 403 Forbidden: If user lacks required permission\n\n    **Audit:**\n    - Creates audit log entry with action=UPDATE and before/after state",
+        "operationId": "update_rule_field_api_v1_rule_fields__field_key__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "field_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Unique field identifier",
+              "title": "Field Key"
+            },
+            "description": "Unique field identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleFieldUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleFieldResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rule-fields/{field_key}/metadata": {
+      "get": {
+        "tags": [
+          "Rule Fields"
+        ],
+        "summary": "Get all metadata for a field",
+        "description": "Retrieve all metadata entries for a specific rule field.\n\n    Metadata provides extensible configuration for fields, such as:\n    - Velocity field configurations (aggregation, window, group_by)\n    - UI display settings (group, order)\n    - Validation rules (enum_values, min/max, regex)\n\n    **Path Parameters:**\n    - `field_key`: Unique identifier of the field\n\n    **Authentication:**\n    - Requires valid JWT token\n    - No specific role required (authenticated users can read)\n\n    **Errors:**\n    - 404 Not Found: If field_key does not exist",
+        "operationId": "get_field_metadata_api_v1_rule_fields__field_key__metadata_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "field_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Unique field identifier",
+              "title": "Field Key"
+            },
+            "description": "Unique field identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RuleFieldMetadataResponse"
+                  },
+                  "title": "Response Get Field Metadata Api V1 Rule Fields  Field Key  Metadata Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rule-fields/{field_key}/metadata/{meta_key}": {
+      "get": {
+        "tags": [
+          "Rule Fields"
+        ],
+        "summary": "Get specific metadata entry",
+        "description": "Retrieve a specific metadata entry for a field.\n\n    **Path Parameters:**\n    - `field_key`: Unique identifier of the field\n    - `meta_key`: Metadata key (e.g., \"velocity\", \"ui_config\", \"validation\")\n\n    **Authentication:**\n    - Requires valid JWT token\n    - No specific role required (authenticated users can read)\n\n    **Errors:**\n    - 404 Not Found: If field_key or meta_key does not exist",
+        "operationId": "get_specific_metadata_api_v1_rule_fields__field_key__metadata__meta_key__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "field_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Unique field identifier",
+              "title": "Field Key"
+            },
+            "description": "Unique field identifier"
+          },
+          {
+            "name": "meta_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Metadata key",
+              "title": "Meta Key"
+            },
+            "description": "Metadata key"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleFieldMetadataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Rule Fields"
+        ],
+        "summary": "Create or update metadata",
+        "description": "Create or update a metadata entry for a field (upsert operation).\n\n    If metadata with the given meta_key already exists, it will be updated.\n    Otherwise, a new metadata entry will be created.\n\n    **Path Parameters:**\n    - `field_key`: Unique identifier of the field\n    - `meta_key`: Metadata key (e.g., \"velocity\", \"ui_config\")\n\n    **Request Body:**\n    - `meta_value`: JSONB object containing the metadata configuration\n\n    **Authentication:**\n    - Requires valid JWT token with `rule_field:update` permission\n\n    **Errors:**\n    - 404 Not Found: If field_key does not exist\n    - 403 Forbidden: If user lacks required permission\n\n    **Audit:**\n    - Creates audit log entry with action=CREATE or UPDATE\n\n    **Example:**\n    ```json\n    {\n      \"meta_value\": {\n        \"aggregation\": \"COUNT\",\n        \"metric\": \"txn\",\n        \"window\": {\"value\": 10, \"unit\": \"MINUTES\"},\n        \"group_by\": [\"CARD\"]\n      }\n    }\n    ```",
+        "operationId": "upsert_metadata_api_v1_rule_fields__field_key__metadata__meta_key__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "field_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Unique field identifier",
+              "title": "Field Key"
+            },
+            "description": "Unique field identifier"
+          },
+          {
+            "name": "meta_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Metadata key",
+              "title": "Meta Key"
+            },
+            "description": "Metadata key"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleFieldMetadataCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleFieldMetadataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Rule Fields"
+        ],
+        "summary": "Delete metadata entry",
+        "description": "Delete a specific metadata entry for a field.\n\n    **Path Parameters:**\n    - `field_key`: Unique identifier of the field\n    - `meta_key`: Metadata key to delete\n\n    **Authentication:**\n    - Requires valid JWT token with `rule_field:delete` permission\n\n    **Errors:**\n    - 404 Not Found: If field_key or meta_key does not exist\n    - 403 Forbidden: If user lacks required permission\n\n    **Audit:**\n    - Creates audit log entry with action=DELETE and old state\n\n    **Response:**\n    - 204 No Content on success",
+        "operationId": "delete_metadata_api_v1_rule_fields__field_key__metadata__meta_key__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "field_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Unique field identifier",
+              "title": "Field Key"
+            },
+            "description": "Unique field identifier"
+          },
+          {
+            "name": "meta_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Metadata key",
+              "title": "Meta Key"
+            },
+            "description": "Metadata key"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/field-registry": {
+      "get": {
+        "tags": [
+          "Field Registry"
+        ],
+        "summary": "Get active field registry info",
+        "description": "Retrieve information about the active field registry.\n\n    Returns the latest manifest and field count.\n\n    **Authentication:**\n    - Requires valid JWT token\n    - No specific role required (authenticated users can read)",
+        "operationId": "get_active_registry_api_v1_field_registry_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Active Registry Api V1 Field Registry Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/field-registry/versions": {
+      "get": {
+        "tags": [
+          "Field Registry"
+        ],
+        "summary": "List published field registry versions",
+        "description": "Retrieve all published field registry versions.\n\n    **Authentication:**\n    - Requires valid JWT token\n    - No specific role required (authenticated users can read)",
+        "operationId": "list_registry_versions_api_v1_field_registry_versions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FieldRegistryManifestResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Registry Versions Api V1 Field Registry Versions Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/field-registry/versions/{registry_version}": {
+      "get": {
+        "tags": [
+          "Field Registry"
+        ],
+        "summary": "Get specific registry version",
+        "description": "Retrieve a specific field registry manifest by version number.\n\n    **Path Parameters:**\n    - `registry_version`: Registry version number\n\n    **Authentication:**\n    - Requires valid JWT token\n    - No specific role required (authenticated users can read)\n\n    **Errors:**\n    - 404 Not Found: If registry version does not exist",
+        "operationId": "get_registry_version_api_v1_field_registry_versions__registry_version__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registry_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Registry version number",
+              "title": "Registry Version"
+            },
+            "description": "Registry version number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldRegistryManifestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/field-registry/versions/{registry_version}/fields": {
+      "get": {
+        "tags": [
+          "Field Registry"
+        ],
+        "summary": "Get fields in a registry version",
+        "description": "Retrieve all fields that were part of a specific registry version.\n\n    **Path Parameters:**\n    - `registry_version`: Registry version number\n\n    **Authentication:**\n    - Requires valid JWT token\n    - No specific role required (authenticated users can read)",
+        "operationId": "get_registry_version_fields_api_v1_field_registry_versions__registry_version__fields_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registry_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Registry version number",
+              "title": "Registry Version"
+            },
+            "description": "Registry version number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Registry Version Fields Api V1 Field Registry Versions  Registry Version  Fields Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/field-registry/next-field-id": {
+      "get": {
+        "tags": [
+          "Field Registry"
+        ],
+        "summary": "Get next available field_id",
+        "description": "Get the next available field_id for creating new fields.\n\n    Standard fields use IDs 1-26. New custom fields start from 27.\n\n    **Authentication:**\n    - Requires valid JWT token\n    - Requires `rule_field:create` permission",
+        "operationId": "get_next_field_id_api_v1_field_registry_next_field_id_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Next Field Id Api V1 Field Registry Next Field Id Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/field-registry/publish": {
+      "post": {
+        "tags": [
+          "Field Registry"
+        ],
+        "summary": "Publish field registry",
+        "description": "Manually publish a new field registry version.\n\n    Compiles all APPROVED field versions into a JSON artifact\n    and publishes to S3-compatible storage.\n\n    **Authentication:**\n    - Requires valid JWT token\n    - Requires `rule_field:create` permission\n\n    **Audit:**\n    - Creates audit log entry with action=PUBLISH",
+        "operationId": "publish_registry_api_v1_field_registry_publish_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldRegistryManifestResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/rules": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Post Rule",
+        "description": "Create a new rule with an initial DRAFT version.\n\nRequires `rule:create` permission.",
+        "operationId": "post_rule_api_v1_rules_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Get Rules",
+        "description": "List all rules with keyset pagination.\n\nRequires `rule:read` permission.",
+        "operationId": "get_rules_api_v1_rules_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Base64-encoded cursor from previous page",
+              "title": "Cursor"
+            },
+            "description": "Base64-encoded cursor from previous page"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of items per page (max 100)",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Number of items per page (max 100)"
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CursorDirection",
+              "description": "Pagination direction",
+              "default": "next"
+            },
+            "description": "Pagination direction"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysetPaginatedResponse_RuleResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rules/{rule_id}": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Get Rule",
+        "description": "Get a specific rule by ID.\n\nRequires `rule:read` permission.",
+        "operationId": "get_rule_api_v1_rules__rule_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rules/{rule_id}/versions": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Post Rule Version",
+        "description": "Create a new version of an existing rule.\n\nRequires `rule:update` permission.",
+        "operationId": "post_rule_version_api_v1_rules__rule_id__versions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleVersionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "List Rule Versions Endpoint",
+        "description": "List all versions for a specific rule (for analyst deep links).\n\nReturns all rule versions ordered by version number (newest first).\n\nRequires `rule:read` permission.",
+        "operationId": "list_rule_versions_endpoint_api_v1_rules__rule_id__versions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rule-versions/{rule_version_id}/submit": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Submit Version",
+        "description": "Submit a rule version for approval.\n\nRequires `rule:submit` permission.",
+        "operationId": "submit_version_api_v1_rule_versions__rule_version_id__submit_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleVersionSubmitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rule-versions/{rule_version_id}/approve": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Approve Version",
+        "description": "Approve a rule version.\n\nRequires `rule:approve` permission.",
+        "operationId": "approve_version_api_v1_rule_versions__rule_version_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleVersionApproveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rule-versions/{rule_version_id}/reject": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Reject Version",
+        "description": "Reject a rule version.\n\nRequires `rule:reject` permission.",
+        "operationId": "reject_version_api_v1_rule_versions__rule_version_id__reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleVersionRejectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rule-versions/{rule_version_id}": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Get Rule Version Endpoint",
+        "description": "Get a specific rule version by ID (for analyst deep links).\n\nReturns rule version details including rule name, type, and condition tree.\n\nRequires `rule:read` permission.",
+        "operationId": "get_rule_version_endpoint_api_v1_rule_versions__rule_version_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleVersionDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rules/{rule_id}/summary": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Get Rule Summary Endpoint",
+        "description": "Get rule summary with latest version info (lightweight response for analyst UI).\n\nReturns rule metadata plus the latest version's priority and action.\n\nRequires `rule:read` permission.",
+        "operationId": "get_rule_summary_endpoint_api_v1_rules__rule_id__summary_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rules/simulate": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Simulate Rule",
+        "description": "Simulate a rule against historical transactions.\n\nThis endpoint allows analysts to test a rule condition before submitting for approval.\nThe simulation runs against historical transaction data.\n\nNote: This is a placeholder implementation. Full integration with transaction-management\nis required for actual simulation functionality.\n\nRequires `rule:read` permission.",
+        "operationId": "simulate_rule_api_v1_rules_simulate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSimulateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSimulateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/approvals": {
+      "get": {
+        "tags": [
+          "approvals"
+        ],
+        "summary": "Get Approvals",
+        "description": "List approvals with optional filters and keyset pagination.\n\nUses cursor-based pagination for efficient data retrieval.\n\n**Parameters:**\n- `status`: Filter by approval status (e.g., \"pending\", \"approved\", \"rejected\")\n- `entity_type`: Filter by entity type (e.g., \"rule\", \"ruleset\")\n- `cursor`: Optional cursor from previous page response\n- `limit`: Number of items per page (default: 50, max: 100)\n- `direction`: \"next\" for forward pagination, \"prev\" for backward\n\n**Examples:**\n    - First page: GET /approvals?limit=50\n    - Filtered: GET /approvals?status=pending&entity_type=rule\n    - Next page: GET /approvals?cursor=abc123&limit=50&direction=next",
+        "operationId": "get_approvals_api_v1_approvals_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Base64-encoded cursor from previous page",
+              "title": "Cursor"
+            },
+            "description": "Base64-encoded cursor from previous page"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of items per page (max 100)",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Number of items per page (max 100)"
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CursorDirection",
+              "description": "Pagination direction",
+              "default": "next"
+            },
+            "description": "Pagination direction"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysetPaginatedResponse_ApprovalResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit-log": {
+      "get": {
+        "tags": [
+          "approvals"
+        ],
+        "summary": "Get Audit Log",
+        "description": "List audit log with optional filters and keyset pagination.\n\nUses cursor-based pagination for efficient data retrieval.\n\n**Parameters:**\n- `entity_type`: Filter by entity type (e.g., \"rule\", \"ruleset\")\n- `entity_id`: Filter by specific entity ID\n- `action`: Filter by action type (e.g., \"create\", \"update\", \"approve\")\n- `performed_by`: Filter by user who performed the action\n- `since`: ISO 8601 datetime filter (start of range)\n- `until`: ISO 8601 datetime filter (end of range)\n- `cursor`: Optional cursor from previous page response\n- `limit`: Number of items per page (default: 100, max: 1000)\n- `direction`: \"next\" for forward pagination, \"prev\" for backward\n\n**Examples:**\n    - First page: GET /audit-log?limit=100\n    - Filtered: GET /audit-log?action=approve&since=2024-01-01T00:00:00Z\n    - Next page: GET /audit-log?cursor=abc123&limit=100&direction=next",
+        "operationId": "get_audit_log_api_v1_audit_log_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "name": "performed_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Performed By"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Base64-encoded cursor from previous page",
+              "title": "Cursor"
+            },
+            "description": "Base64-encoded cursor from previous page"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of items per page (max 1000)",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Number of items per page (max 1000)"
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CursorDirection",
+              "description": "Pagination direction",
+              "default": "next"
+            },
+            "description": "Pagination direction"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysetPaginatedResponse_AuditLogResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rulesets": {
+      "post": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "Create Ruleset",
+        "description": "Create a new ruleset identity.\n\nThe ruleset identity defines the scope (environment, region, country, rule_type)\nfor which versions can be created. One ruleset per unique scope combination.",
+        "operationId": "create_ruleset_api_v1_rulesets_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSetCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "List Rulesets",
+        "description": "List ruleset identities with keyset pagination.",
+        "operationId": "list_rulesets_api_v1_rulesets_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Base64-encoded cursor from previous page",
+              "title": "Cursor"
+            },
+            "description": "Base64-encoded cursor from previous page"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CursorDirection",
+              "description": "Pagination direction",
+              "default": "next"
+            },
+            "description": "Pagination direction"
+          },
+          {
+            "name": "rule_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by rule type",
+              "title": "Rule Type"
+            },
+            "description": "Filter by rule type"
+          },
+          {
+            "name": "environment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by environment",
+              "title": "Environment"
+            },
+            "description": "Filter by environment"
+          },
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by region",
+              "title": "Region"
+            },
+            "description": "Filter by region"
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by country",
+              "title": "Country"
+            },
+            "description": "Filter by country"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysetPaginatedResponse_RuleSetResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rulesets/{ruleset_id}": {
+      "get": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "Get Ruleset",
+        "description": "Get a ruleset identity by ID.",
+        "operationId": "get_ruleset_api_v1_rulesets__ruleset_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruleset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ruleset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rulesets/{ruleset_id}/versions": {
+      "get": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "List Ruleset Versions",
+        "description": "List all versions of a ruleset.",
+        "operationId": "list_ruleset_versions_api_v1_rulesets__ruleset_id__versions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruleset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ruleset Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Base64-encoded cursor",
+              "title": "Cursor"
+            },
+            "description": "Base64-encoded cursor"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CursorDirection",
+              "default": "next"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status",
+              "title": "Status"
+            },
+            "description": "Filter by status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysetPaginatedResponse_RuleSetVersionResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "Create Ruleset Version",
+        "description": "Create a new version of a ruleset.\n\nCreates a DRAFT version with the given rule versions attached.",
+        "operationId": "create_ruleset_version_api_v1_rulesets__ruleset_id__versions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruleset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ruleset Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSetVersionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ruleset-versions/{ruleset_version_id}": {
+      "get": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "Get Ruleset Version",
+        "description": "Get a ruleset version by ID.",
+        "operationId": "get_ruleset_version_api_v1_ruleset_versions__ruleset_version_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruleset_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ruleset Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ruleset-versions/{ruleset_version_id}/submit": {
+      "post": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "Submit Ruleset Version",
+        "description": "Submit a ruleset version for approval.",
+        "operationId": "submit_ruleset_version_api_v1_ruleset_versions__ruleset_version_id__submit_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruleset_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ruleset Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSetVersionSubmitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ruleset-versions/{ruleset_version_id}/approve": {
+      "post": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "Approve Ruleset Version",
+        "description": "Approve a ruleset version (triggers publishing to S3).",
+        "operationId": "approve_ruleset_version_api_v1_ruleset_versions__ruleset_version_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruleset_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ruleset Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSetVersionApproveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ruleset-versions/{ruleset_version_id}/reject": {
+      "post": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "Reject Ruleset Version",
+        "description": "Reject a ruleset version.",
+        "operationId": "reject_ruleset_version_api_v1_ruleset_versions__ruleset_version_id__reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruleset_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ruleset Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSetVersionRejectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ruleset-versions/{ruleset_version_id}/activate": {
+      "post": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "Activate Ruleset Version",
+        "description": "Activate a ruleset version (makes it live for runtime).",
+        "operationId": "activate_ruleset_version_api_v1_ruleset_versions__ruleset_version_id__activate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruleset_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ruleset Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSetVersionActivateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ruleset-versions/{ruleset_version_id}/compile": {
+      "post": {
+        "tags": [
+          "rulesets"
+        ],
+        "summary": "Compile Ruleset Version",
+        "description": "Compile a ruleset version to AST (in-memory only, not stored).",
+        "operationId": "compile_ruleset_version_api_v1_ruleset_versions__ruleset_version_id__compile_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruleset_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ruleset Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompiledAstResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/test-token": {
+      "get": {
+        "tags": [
+          "test-utils",
+          "test-utils"
+        ],
+        "summary": "Generate Test Token",
+        "description": "Generate a real Auth0 M2M token for local development testing.\n\n**ONLY AVAILABLE IN NON-PRODUCTION ENVIRONMENTS**\n\nThis endpoint calls Auth0 using Client Credentials flow to get a real JWT token\nthat can be used for testing authenticated endpoints in Swagger UI or via curl.\n\n**IMPORTANT**: This gives an M2M token representing the CLIENT, not a USER.\nThe token's `sub` claim will be the client ID (e.g.,\n\"pcVcfq1F7U9WBXit3Y1QoQgc85hOQPrY@clients\").\nThis means maker=checker validation will REJECT approval requests.\n\n**For maker-checker testing**, use /test-user-token endpoint instead.\n\n**Requirements:**\n- AUTH0_CLIENT_ID environment variable must be set\n- AUTH0_CLIENT_SECRET environment variable must be set\n\n**Use in Swagger UI:**\n1. Click \"Try it out\"\n2. Click \"Execute\"\n3. Copy the \"access_token\" from the response\n4. Click \"Authorize\" button at top of page\n5. Paste the token (without \"Bearer \" prefix)\n6. Click \"Authorize\"\n\n**Use with curl:**\n```bash\n# Get token\nTOKEN=$(curl -s http://127.0.0.1:8000/api/v1/test-token | jq -r '.access_token')\n\n# Use token in requests\ncurl -H \"Authorization: Bearer $TOKEN\" http://127.0.0.1:8000/api/v1/rule-fields\n```\n\nReturns:\n    Real Auth0 JWT token valid for 1 hour\n\nRaises:\n    403: If called in production environment\n    500: If Auth0 credentials are not configured or request fails",
+        "operationId": "generate_test_token_api_v1_test_token_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Generate Test Token Api V1 Test Token Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/test-user-token": {
+      "get": {
+        "tags": [
+          "test-utils",
+          "test-utils"
+        ],
+        "summary": "Generate Test User Token",
+        "description": "Generate a real Auth0 user token for maker-checker workflow testing.\n\n**ONLY AVAILABLE IN NON-PRODUCTION ENVIRONMENTS**\n\nThis endpoint uses the Resource Owner Password Credentials flow to get\ntokens for specific test users. This enables testing maker-checker\nworkflows where maker and checker are different users.\n\n**Requirements:**\n1. AUTH0_TEST_CLIENT_ID must be set with password grant enabled\n2. AUTH0_TEST_CLIENT_SECRET must be set\n3. Test users must exist in Auth0 (test-rule-maker, test-rule-checker, etc.)\n\n**Setup in Auth0:**\n- Create a test client with Grant Types: Password, Client Credentials\n- Configure Username-Password-Authentication connection\n- Add test users: test-rule-maker@fraud-platform.test, etc.\n\n**Use in Swagger UI:**\n1. Set 'user' parameter to 'maker' and execute to get maker token\n2. Click \"Authorize\" and paste the maker token\n3. Submit a rule for approval\n4. Set 'user' parameter to 'checker' and execute to get checker token\n5. Authorize with checker token and approve the submission\n\n**Use with curl:**\n```bash\n# Get maker token\nMAKER_TOKEN=$(\n    curl -s \"http://127.0.0.1:8000/api/v1/test-user-token?user=maker\"         | jq -r '.access_token'\n)\n\n# Get checker token\nCHECKER_TOKEN=$(\n    curl -s \"http://127.0.0.1:8000/api/v1/test-user-token?user=checker\"         | jq -r '.access_token'\n)\n\n# Submit as maker\ncurl -X POST -H \"Authorization: Bearer $MAKER_TOKEN\"         http://127.0.0.1:8000/api/v1/rule-versions/{id}/submit\n\n# Approve as checker\ncurl -X POST -H \"Authorization: Bearer $CHECKER_TOKEN\"         http://127.0.0.1:8000/api/v1/rule-versions/{id}/approve\n```\n\nReturns:\n    Real Auth0 JWT token for the specified test user\n\nRaises:\n    403: If called in production environment\n    400: If invalid user parameter\n    500: If Auth0 configuration is incomplete or request fails",
+        "operationId": "generate_test_user_token_api_v1_test_user_token_get",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "User type: 'maker', 'checker', or 'admin'",
+              "enum": [
+                "maker",
+                "checker",
+                "admin"
+              ],
+              "default": "maker",
+              "title": "User"
+            },
+            "description": "User type: 'maker', 'checker', or 'admin'"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Generate Test User Token Api V1 Test User Token Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApprovalResponse": {
+        "properties": {
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approval Id"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "maker": {
+            "type": "string",
+            "title": "Maker"
+          },
+          "checker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checker"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "remarks": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remarks"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "ruleset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruleset Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approval_id",
+          "entity_type",
+          "entity_id",
+          "action",
+          "maker",
+          "status",
+          "created_at"
+        ],
+        "title": "ApprovalResponse"
+      },
+      "AuditLogResponse": {
+        "properties": {
+          "audit_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Audit Id"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "old_value": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Value"
+          },
+          "new_value": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Value"
+          },
+          "performed_by": {
+            "type": "string",
+            "title": "Performed By"
+          },
+          "performed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Performed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audit_id",
+          "entity_type",
+          "entity_id",
+          "action",
+          "performed_by",
+          "performed_at"
+        ],
+        "title": "AuditLogResponse"
+      },
+      "CompiledAstResponse": {
+        "properties": {
+          "ruleset_version_id": {
+            "type": "string",
+            "title": "Ruleset Version Id"
+          },
+          "compiled_ast": {
+            "$ref": "#/components/schemas/CompiledAstStructure"
+          },
+          "checksum": {
+            "type": "string",
+            "title": "Checksum"
+          },
+          "can_publish": {
+            "type": "boolean",
+            "title": "Can Publish"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ruleset_version_id",
+          "compiled_ast",
+          "checksum",
+          "can_publish"
+        ],
+        "title": "CompiledAstResponse",
+        "description": "Response containing the compiled AST (in-memory only, not stored in DB)."
+      },
+      "CompiledAstStructure": {
+        "properties": {
+          "rulesetId": {
+            "type": "string",
+            "title": "Rulesetid"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "ruleType": {
+            "type": "string",
+            "title": "Ruletype"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/CompiledEvaluation"
+          },
+          "velocityFailurePolicy": {
+            "type": "string",
+            "title": "Velocityfailurepolicy"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/CompiledRule"
+            },
+            "type": "array",
+            "title": "Rules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rulesetId",
+          "version",
+          "ruleType",
+          "evaluation",
+          "velocityFailurePolicy",
+          "rules"
+        ],
+        "title": "CompiledAstStructure",
+        "description": "The complete compiled AST structure for a ruleset."
+      },
+      "CompiledEvaluation": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "CompiledEvaluation",
+        "description": "Evaluation configuration for the ruleset."
+      },
+      "CompiledRule": {
+        "properties": {
+          "ruleId": {
+            "type": "string",
+            "title": "Ruleid"
+          },
+          "ruleVersionId": {
+            "type": "string",
+            "title": "Ruleversionid"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "scope": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scope"
+          },
+          "when": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "When"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ruleId",
+          "ruleVersionId",
+          "priority",
+          "scope",
+          "when",
+          "action"
+        ],
+        "title": "CompiledRule",
+        "description": "A single rule in the compiled AST."
+      },
+      "CursorDirection": {
+        "type": "string",
+        "enum": [
+          "next",
+          "prev"
+        ],
+        "title": "CursorDirection",
+        "description": "Direction for cursor-based pagination."
+      },
+      "DataType": {
+        "type": "string",
+        "enum": [
+          "STRING",
+          "NUMBER",
+          "BOOLEAN",
+          "DATE",
+          "ENUM"
+        ],
+        "title": "DataType",
+        "description": "Data types for rule fields.\nConstraint: rule_fields.data_type must be one of these values."
+      },
+      "FieldRegistryManifestResponse": {
+        "properties": {
+          "manifest_id": {
+            "type": "string",
+            "title": "Manifest Id",
+            "description": "Unique identifier for the manifest"
+          },
+          "registry_version": {
+            "type": "integer",
+            "title": "Registry Version",
+            "description": "Registry version number"
+          },
+          "artifact_uri": {
+            "type": "string",
+            "title": "Artifact Uri",
+            "description": "S3 URI of the published artifact"
+          },
+          "checksum": {
+            "type": "string",
+            "title": "Checksum",
+            "description": "SHA-256 checksum (sha256:<hex>)"
+          },
+          "field_count": {
+            "type": "integer",
+            "title": "Field Count",
+            "description": "Number of fields in the registry"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Timestamp when manifest was created"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By",
+            "description": "User who triggered the publish"
+          }
+        },
+        "type": "object",
+        "required": [
+          "manifest_id",
+          "registry_version",
+          "artifact_uri",
+          "checksum",
+          "field_count",
+          "created_at",
+          "created_by"
+        ],
+        "title": "FieldRegistryManifestResponse",
+        "description": "Schema for FieldRegistryManifest responses."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "KeysetPaginatedResponse_ApprovalResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "prev_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Cursor"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "has_next",
+          "has_prev",
+          "limit"
+        ],
+        "title": "KeysetPaginatedResponse[ApprovalResponse]"
+      },
+      "KeysetPaginatedResponse_AuditLogResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditLogResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "prev_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Cursor"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "has_next",
+          "has_prev",
+          "limit"
+        ],
+        "title": "KeysetPaginatedResponse[AuditLogResponse]"
+      },
+      "KeysetPaginatedResponse_RuleResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RuleResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "prev_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Cursor"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "has_next",
+          "has_prev",
+          "limit"
+        ],
+        "title": "KeysetPaginatedResponse[RuleResponse]"
+      },
+      "KeysetPaginatedResponse_RuleSetResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RuleSetResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "prev_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Cursor"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "has_next",
+          "has_prev",
+          "limit"
+        ],
+        "title": "KeysetPaginatedResponse[RuleSetResponse]"
+      },
+      "KeysetPaginatedResponse_RuleSetVersionResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RuleSetVersionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "prev_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Cursor"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "has_next",
+          "has_prev",
+          "limit"
+        ],
+        "title": "KeysetPaginatedResponse[RuleSetVersionResponse]"
+      },
+      "Operator": {
+        "type": "string",
+        "enum": [
+          "EQ",
+          "NE",
+          "IN",
+          "NOT_IN",
+          "GT",
+          "GTE",
+          "LT",
+          "LTE",
+          "BETWEEN",
+          "CONTAINS",
+          "STARTS_WITH",
+          "ENDS_WITH",
+          "REGEX"
+        ],
+        "title": "Operator",
+        "description": "Supported operators for rule conditions.\nUsed in rule_fields.allowed_operators array."
+      },
+      "RuleAction": {
+        "type": "string",
+        "enum": [
+          "APPROVE",
+          "DECLINE",
+          "REVIEW"
+        ],
+        "title": "RuleAction",
+        "description": "Action to take when a rule matches.\nMust match runtime Decision.java values."
+      },
+      "RuleCreate": {
+        "properties": {
+          "rule_name": {
+            "type": "string",
+            "title": "Rule Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/RuleType"
+          },
+          "condition_tree": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condition Tree"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 100
+          },
+          "action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleAction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Action when rule matches. Smart default based on rule_type when not provided."
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_name",
+          "rule_type"
+        ],
+        "title": "RuleCreate"
+      },
+      "RuleFieldCreate": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Display Name",
+            "description": "Human-readable name for the field",
+            "examples": [
+              "Merchant Category Code"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Detailed description of the field",
+            "examples": [
+              "Merchant category code for transaction classification"
+            ]
+          },
+          "data_type": {
+            "$ref": "#/components/schemas/DataType",
+            "description": "Data type of the field (STRING, NUMBER, BOOLEAN, DATE, ENUM)",
+            "examples": [
+              "STRING"
+            ]
+          },
+          "allowed_operators": {
+            "items": {
+              "$ref": "#/components/schemas/Operator"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Allowed Operators",
+            "description": "List of operators allowed for this field",
+            "examples": [
+              [
+                "EQ",
+                "IN"
+              ]
+            ]
+          },
+          "multi_value_allowed": {
+            "type": "boolean",
+            "title": "Multi Value Allowed",
+            "description": "Whether the field can have multiple values",
+            "default": false,
+            "examples": [
+              false
+            ]
+          },
+          "is_sensitive": {
+            "type": "boolean",
+            "title": "Is Sensitive",
+            "description": "Whether the field contains sensitive data (PII, etc.)",
+            "default": false,
+            "examples": [
+              false
+            ]
+          },
+          "field_key": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Field Key",
+            "description": "Unique identifier for the field (lowercase, alphanumeric, underscores only)",
+            "examples": [
+              "mcc"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_name",
+          "data_type",
+          "allowed_operators",
+          "field_key"
+        ],
+        "title": "RuleFieldCreate",
+        "description": "Schema for creating a new RuleField.",
+        "examples": [
+          {
+            "allowed_operators": [
+              "EQ",
+              "IN"
+            ],
+            "data_type": "STRING",
+            "description": "Merchant category code",
+            "display_name": "Merchant Category Code",
+            "field_key": "mcc",
+            "is_sensitive": false,
+            "multi_value_allowed": true
+          }
+        ]
+      },
+      "RuleFieldMetadataCreate": {
+        "properties": {
+          "meta_value": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta Value",
+            "description": "JSONB metadata value (flexible key-value structure)",
+            "examples": [
+              {
+                "aggregation": "COUNT",
+                "group_by": [
+                  "CARD"
+                ],
+                "metric": "txn",
+                "window": {
+                  "unit": "MINUTES",
+                  "value": 10
+                }
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "meta_value"
+        ],
+        "title": "RuleFieldMetadataCreate",
+        "description": "Schema for creating/upserting RuleFieldMetadata.",
+        "examples": [
+          {
+            "meta_value": {
+              "aggregation": "COUNT",
+              "group_by": [
+                "CARD"
+              ],
+              "metric": "txn",
+              "window": {
+                "unit": "MINUTES",
+                "value": 10
+              }
+            }
+          }
+        ]
+      },
+      "RuleFieldMetadataResponse": {
+        "properties": {
+          "meta_value": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta Value",
+            "description": "JSONB metadata value (flexible key-value structure)",
+            "examples": [
+              {
+                "aggregation": "COUNT",
+                "group_by": [
+                  "CARD"
+                ],
+                "metric": "txn",
+                "window": {
+                  "unit": "MINUTES",
+                  "value": 10
+                }
+              }
+            ]
+          },
+          "field_key": {
+            "type": "string",
+            "title": "Field Key",
+            "description": "The field this metadata belongs to",
+            "examples": [
+              "velocity_txn_count_10m_by_card"
+            ]
+          },
+          "meta_key": {
+            "type": "string",
+            "title": "Meta Key",
+            "description": "Metadata key identifier",
+            "examples": [
+              "velocity"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Description of the metadata"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Timestamp when the metadata was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meta_value",
+          "field_key",
+          "meta_key",
+          "created_at"
+        ],
+        "title": "RuleFieldMetadataResponse",
+        "description": "Schema for RuleFieldMetadata responses.",
+        "examples": [
+          {
+            "created_at": "2026-01-01T12:00:00Z",
+            "field_key": "velocity_txn_count_10m_by_card",
+            "meta_key": "velocity",
+            "meta_value": {
+              "aggregation": "COUNT",
+              "group_by": [
+                "CARD"
+              ],
+              "metric": "txn",
+              "window": {
+                "unit": "MINUTES",
+                "value": 10
+              }
+            }
+          }
+        ]
+      },
+      "RuleFieldResponse": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Display Name",
+            "description": "Human-readable name for the field",
+            "examples": [
+              "Merchant Category Code"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Detailed description of the field",
+            "examples": [
+              "Merchant category code for transaction classification"
+            ]
+          },
+          "data_type": {
+            "$ref": "#/components/schemas/DataType",
+            "description": "Data type of the field (STRING, NUMBER, BOOLEAN, DATE, ENUM)",
+            "examples": [
+              "STRING"
+            ]
+          },
+          "allowed_operators": {
+            "items": {
+              "$ref": "#/components/schemas/Operator"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Allowed Operators",
+            "description": "List of operators allowed for this field",
+            "examples": [
+              [
+                "EQ",
+                "IN"
+              ]
+            ]
+          },
+          "multi_value_allowed": {
+            "type": "boolean",
+            "title": "Multi Value Allowed",
+            "description": "Whether the field can have multiple values",
+            "default": false,
+            "examples": [
+              false
+            ]
+          },
+          "is_sensitive": {
+            "type": "boolean",
+            "title": "Is Sensitive",
+            "description": "Whether the field contains sensitive data (PII, etc.)",
+            "default": false,
+            "examples": [
+              false
+            ]
+          },
+          "field_key": {
+            "type": "string",
+            "title": "Field Key",
+            "description": "Unique identifier for the field",
+            "examples": [
+              "mcc"
+            ]
+          },
+          "field_id": {
+            "type": "integer",
+            "title": "Field Id",
+            "description": "Integer ID matching engine FieldRegistry",
+            "examples": [
+              1
+            ]
+          },
+          "current_version": {
+            "type": "integer",
+            "title": "Current Version",
+            "description": "Latest version number",
+            "examples": [
+              1
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Optimistic locking version",
+            "examples": [
+              1
+            ]
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By",
+            "description": "User who created the field",
+            "examples": [
+              "user@example.com"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Timestamp when the field was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "Timestamp when the field was last updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_name",
+          "data_type",
+          "allowed_operators",
+          "field_key",
+          "field_id",
+          "current_version",
+          "version",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RuleFieldResponse",
+        "description": "Schema for RuleField responses (GET endpoints).",
+        "examples": [
+          {
+            "allowed_operators": [
+              "EQ",
+              "IN"
+            ],
+            "created_at": "2026-01-01T12:00:00Z",
+            "created_by": "system",
+            "current_version": 1,
+            "data_type": "STRING",
+            "description": "Merchant category code",
+            "display_name": "MCC",
+            "field_id": 7,
+            "field_key": "mcc",
+            "is_sensitive": false,
+            "multi_value_allowed": true,
+            "updated_at": "2026-01-01T12:00:00Z",
+            "version": 1
+          }
+        ]
+      },
+      "RuleFieldUpdate": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name",
+            "description": "Human-readable name for the field",
+            "examples": [
+              "Updated Display Name"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Detailed description of the field"
+          },
+          "data_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Data type of the field",
+            "examples": [
+              "NUMBER"
+            ]
+          },
+          "allowed_operators": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Operator"
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Operators",
+            "description": "List of operators allowed for this field",
+            "examples": [
+              [
+                "GT",
+                "LT"
+              ]
+            ]
+          },
+          "multi_value_allowed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multi Value Allowed",
+            "description": "Whether the field can have multiple values",
+            "examples": [
+              true
+            ]
+          },
+          "is_sensitive": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Sensitive",
+            "description": "Whether the field contains sensitive data",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "type": "object",
+        "title": "RuleFieldUpdate",
+        "description": "Schema for updating an existing RuleField.\n\nAll fields are optional to support partial updates.\nfield_key and field_id are immutable and cannot be updated."
+      },
+      "RuleResponse": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "rule_name": {
+            "type": "string",
+            "title": "Rule Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "rule_type": {
+            "type": "string",
+            "title": "Rule Type"
+          },
+          "current_version": {
+            "type": "integer",
+            "title": "Current Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "rule_name",
+          "rule_type",
+          "current_version",
+          "status",
+          "version",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RuleResponse"
+      },
+      "RuleSetCreate": {
+        "properties": {
+          "environment": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Environment",
+            "description": "Environment name (local, dev, test, prod)"
+          },
+          "region": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Region",
+            "description": "Infrastructure boundary (APAC, EMEA, INDIA, AMERICAS)"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Country",
+            "description": "Country code (IN, SG, HK, UK, etc.)"
+          },
+          "rule_type": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Rule Type",
+            "description": "Rule type (ALLOWLIST, BLOCKLIST, AUTH, MONITORING)"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the ruleset"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Description of the ruleset purpose"
+          }
+        },
+        "type": "object",
+        "required": [
+          "environment",
+          "region",
+          "country",
+          "rule_type"
+        ],
+        "title": "RuleSetCreate",
+        "description": "Create a new ruleset identity."
+      },
+      "RuleSetResponse": {
+        "properties": {
+          "ruleset_id": {
+            "type": "string",
+            "title": "Ruleset Id"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "rule_type": {
+            "type": "string",
+            "title": "Rule Type"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ruleset_id",
+          "environment",
+          "region",
+          "country",
+          "rule_type",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RuleSetResponse",
+        "description": "Ruleset identity response."
+      },
+      "RuleSetVersionActivateRequest": {
+        "properties": {
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "Optional idempotency key to prevent duplicate activations"
+          }
+        },
+        "type": "object",
+        "title": "RuleSetVersionActivateRequest",
+        "description": "Activate a ruleset version (makes it live for runtime)."
+      },
+      "RuleSetVersionApproveRequest": {
+        "properties": {
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "Optional idempotency key to prevent duplicate approvals"
+          }
+        },
+        "type": "object",
+        "title": "RuleSetVersionApproveRequest",
+        "description": "Approve a ruleset version (triggers publishing)."
+      },
+      "RuleSetVersionCreate": {
+        "properties": {
+          "rule_version_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Rule Version Ids",
+            "description": "List of approved rule version IDs to include in this ruleset version"
+          }
+        },
+        "type": "object",
+        "title": "RuleSetVersionCreate",
+        "description": "Create a new version of a ruleset."
+      },
+      "RuleSetVersionRejectRequest": {
+        "properties": {
+          "remarks": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remarks",
+            "description": "Optional remarks explaining the rejection"
+          }
+        },
+        "type": "object",
+        "title": "RuleSetVersionRejectRequest",
+        "description": "Reject a ruleset version."
+      },
+      "RuleSetVersionResponse": {
+        "properties": {
+          "ruleset_version_id": {
+            "type": "string",
+            "title": "Ruleset Version Id"
+          },
+          "ruleset_id": {
+            "type": "string",
+            "title": "Ruleset Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "activated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated At"
+          },
+          "rule_versions": {
+            "items": {
+              "$ref": "#/components/schemas/RuleVersionInRuleset"
+            },
+            "type": "array",
+            "title": "Rule Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ruleset_version_id",
+          "ruleset_id",
+          "version",
+          "status",
+          "created_by",
+          "created_at"
+        ],
+        "title": "RuleSetVersionResponse",
+        "description": "Ruleset version response."
+      },
+      "RuleSetVersionSubmitRequest": {
+        "properties": {
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "Optional idempotency key to prevent duplicate submissions"
+          }
+        },
+        "type": "object",
+        "title": "RuleSetVersionSubmitRequest",
+        "description": "Submit a ruleset version for approval."
+      },
+      "RuleSimulateRequest": {
+        "properties": {
+          "rule_type": {
+            "$ref": "#/components/schemas/RuleType",
+            "description": "Rule type being simulated (AUTH, MONITORING, etc.)"
+          },
+          "condition_tree": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Condition Tree",
+            "description": "Condition tree AST to test"
+          },
+          "scope": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scope",
+            "description": "Optional scope dimensions (e.g., {\"network\": [\"VISA\"], \"mcc\": [\"7995\"]})"
+          },
+          "query": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Query",
+            "description": "Query parameters for simulation (e.g., {\"from_date\": \"...\", \"to_date\": \"...\", \"risk_level\": \"HIGH\"})"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_type",
+          "condition_tree",
+          "query"
+        ],
+        "title": "RuleSimulateRequest",
+        "description": "Request to simulate a rule against historical transactions."
+      },
+      "RuleSimulateResponse": {
+        "properties": {
+          "match_count": {
+            "type": "integer",
+            "title": "Match Count",
+            "description": "Number of transactions matching the rule condition"
+          },
+          "sample_transactions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sample Transactions",
+            "description": "Sample transaction IDs that matched the rule"
+          },
+          "simulation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simulation Id",
+            "description": "Optional simulation ID for tracking/resubmission"
+          }
+        },
+        "type": "object",
+        "required": [
+          "match_count"
+        ],
+        "title": "RuleSimulateResponse",
+        "description": "Response from rule simulation."
+      },
+      "RuleSummaryResponse": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "rule_name": {
+            "type": "string",
+            "title": "Rule Name"
+          },
+          "rule_type": {
+            "type": "string",
+            "title": "Rule Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "latest_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version Id"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "rule_name",
+          "rule_type",
+          "status"
+        ],
+        "title": "RuleSummaryResponse",
+        "description": "Rule summary for analyst UI (lightweight response)."
+      },
+      "RuleType": {
+        "type": "string",
+        "enum": [
+          "ALLOWLIST",
+          "BLOCKLIST",
+          "AUTH",
+          "MONITORING"
+        ],
+        "title": "RuleType",
+        "description": "Type of fraud rule - matches fraud_gov.rule_type enum."
+      },
+      "RuleVersionApproveRequest": {
+        "properties": {
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "Optional idempotency key to prevent duplicate approvals. If provided, the same key can be used to safely retry the approve operation.",
+            "examples": [
+              "req_xyz789abc"
+            ]
+          },
+          "remarks": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remarks",
+            "description": "Optional remarks for the approval"
+          }
+        },
+        "type": "object",
+        "title": "RuleVersionApproveRequest",
+        "description": "Request to approve a rule version."
+      },
+      "RuleVersionCreate": {
+        "properties": {
+          "condition_tree": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Condition Tree"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 100
+          },
+          "action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleAction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Action when rule matches. If not provided, determined by rule_type."
+          },
+          "scope": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scope",
+            "description": "Optional scope dimensions (e.g., {\"network\": [\"VISA\"], \"mcc\": [\"7995\"]})"
+          },
+          "expected_rule_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Rule Version",
+            "description": "Expected version of the parent rule for optimistic locking. If provided, the operation will fail if the rule's version doesn't match."
+          }
+        },
+        "type": "object",
+        "required": [
+          "condition_tree"
+        ],
+        "title": "RuleVersionCreate"
+      },
+      "RuleVersionDetailResponse": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "rule_version_id": {
+            "type": "string",
+            "title": "Rule Version Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "rule_name": {
+            "type": "string",
+            "title": "Rule Name",
+            "description": "Rule name from parent Rule entity"
+          },
+          "rule_type": {
+            "type": "string",
+            "title": "Rule Type",
+            "description": "Rule type from parent Rule entity"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "scope": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scope"
+          },
+          "condition_tree": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Condition Tree"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "rule_version_id",
+          "version",
+          "rule_name",
+          "rule_type",
+          "priority",
+          "action",
+          "scope",
+          "condition_tree",
+          "status",
+          "created_at",
+          "created_by"
+        ],
+        "title": "RuleVersionDetailResponse",
+        "description": "Detailed rule version response for analyst deep links."
+      },
+      "RuleVersionInRuleset": {
+        "properties": {
+          "rule_version_id": {
+            "type": "string",
+            "title": "Rule Version Id"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "rule_name": {
+            "type": "string",
+            "title": "Rule Name"
+          },
+          "rule_type": {
+            "type": "string",
+            "title": "Rule Type"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "scope": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scope"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_version_id",
+          "rule_id",
+          "version",
+          "rule_name",
+          "rule_type",
+          "priority",
+          "scope",
+          "status"
+        ],
+        "title": "RuleVersionInRuleset",
+        "description": "Rule version as included in a ruleset."
+      },
+      "RuleVersionRejectRequest": {
+        "properties": {
+          "remarks": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remarks",
+            "description": "Optional remarks explaining the rejection"
+          }
+        },
+        "type": "object",
+        "title": "RuleVersionRejectRequest",
+        "description": "Request to reject a rule version."
+      },
+      "RuleVersionResponse": {
+        "properties": {
+          "rule_version_id": {
+            "type": "string",
+            "title": "Rule Version Id"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "condition_tree": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Condition Tree"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "scope": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scope"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_version_id",
+          "rule_id",
+          "version",
+          "condition_tree",
+          "priority",
+          "action",
+          "scope",
+          "created_by",
+          "created_at",
+          "status"
+        ],
+        "title": "RuleVersionResponse"
+      },
+      "RuleVersionSubmitRequest": {
+        "properties": {
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "Optional idempotency key to prevent duplicate submissions. If provided, the same key can be used to safely retry the submit operation without creating duplicate approvals.",
+            "examples": [
+              "req_abc123xyz"
+            ]
+          },
+          "remarks": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remarks",
+            "description": "Optional remarks for the approval request"
+          }
+        },
+        "type": "object",
+        "title": "RuleVersionSubmitRequest",
+        "description": "Request to submit a rule version for approval."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

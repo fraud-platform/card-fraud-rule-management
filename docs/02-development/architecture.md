@@ -56,7 +56,7 @@ Rule evaluation semantics are locked:
 
 ## Contracts and Source of Truth
 
-- Machine contract: `docs/openapi.json`
-- Human API guide: `../04-api/reference.md`
-- Auth model: `../AUTH_MODEL.md`
+- Machine contract: `docs/03-api/openapi.json`
+- Human API guide: `../03-api/reference.md`
+- Auth model: `../07-reference/auth-model.md`
 - ADRs: `../adr/`

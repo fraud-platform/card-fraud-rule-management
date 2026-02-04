@@ -59,5 +59,5 @@ uv run doppler-local-test tests/test_integration_compiler.py -v
 ## Related Docs
 
 - `architecture.md`
-- `../04-api/reference.md`
+- `../03-api/reference.md`
 - `../adr/0005-deterministic-rule-compiler.md`

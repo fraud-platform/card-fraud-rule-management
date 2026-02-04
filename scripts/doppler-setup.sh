@@ -95,7 +95,7 @@ ${YELLOW}Examples:${NC}
   $0 verify prod             # Check prod secrets are complete
 
 ${YELLOW}Documentation:${NC}
-  docs/03-deployment/doppler-secrets-setup.md
+  docs/05-deployment/doppler-secrets-setup.md
 
 EOF
 }

@@ -107,7 +107,7 @@ uv run auth0-cleanup --yes --verbose
 ```
 
 Auth0 reference docs:
-- `docs/AUTH_MODEL.md`
+- `docs/07-reference/auth-model.md`
 - `docs/01-setup/auth0-setup-guide.md`
 
 ---
@@ -147,10 +147,7 @@ When code changes, update docs in the same PR.
 Minimum docs to check/update:
 - `README.md`
 - `docs/README.md`
-- `docs/04-api/reference.md` (or regenerate `docs/openapi.json` when API/schema changes)
-- `STATUS.md`
-
-`STATUS.md` is the living changelog/status document and must be updated when meaningful changes are made.
+- `docs/03-api/reference.md` (or regenerate `docs/03-api/openapi.json` when API/schema changes)
 
 ---
 
@@ -183,6 +180,6 @@ All agents should:
 If unsure, trust these sources in order:
 1. Code in `app/`, `cli/`, `scripts/`
 2. `pyproject.toml` scripts and config
-3. Generated `docs/openapi.json`
+3. Generated `docs/03-api/openapi.json`
 4. This file (`AGENTS.md`)
 5. Other docs
