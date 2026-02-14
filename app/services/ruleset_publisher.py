@@ -145,6 +145,7 @@ async def _get_next_version(
 
 def _generate_s3_uri(
     environment: str,
+    country: str,
     ruleset_key: str,
     ruleset_version: int,
 ) -> str:
@@ -153,6 +154,7 @@ def _generate_s3_uri(
 
     Args:
         environment: Environment name (dev, test, prod)
+        country: Country code (US, IN, GB, etc.)
         ruleset_key: Ruleset key (CARD_AUTH or CARD_MONITORING)
         ruleset_version: Version number
 
@@ -161,7 +163,11 @@ def _generate_s3_uri(
     """
     # Use the prefix pattern from settings
     prefix = settings.ruleset_artifact_prefix
-    prefix = prefix.replace("{ENV}", environment).replace("{RULESET_KEY}", ruleset_key)
+    prefix = (
+        prefix.replace("{ENV}", environment)
+        .replace("{COUNTRY}", country)
+        .replace("{RULESET_KEY}", ruleset_key)
+    )
 
     # Generate filename: ruleset.json (immutable, versioned by directory)
     filename = f"v{ruleset_version}/ruleset.json"
@@ -175,6 +181,7 @@ def _generate_s3_uri(
 
 def _generate_file_uri(
     environment: str,
+    country: str,
     ruleset_key: str,
     ruleset_version: int,
 ) -> str:
@@ -183,6 +190,7 @@ def _generate_file_uri(
 
     Args:
         environment: Environment name (dev, test, prod)
+        country: Country code (US, IN, GB, etc.)
         ruleset_key: Ruleset key (CARD_AUTH or CARD_MONITORING)
         ruleset_version: Version number
 
@@ -192,8 +200,8 @@ def _generate_file_uri(
     # Use filesystem directory from settings
     base_dir = Path(settings.ruleset_filesystem_dir)
 
-    # Create subdirectories: base_dir/{ENV}/{RULESET_KEY}/v{VERSION}/
-    version_dir = base_dir / environment / ruleset_key / f"v{ruleset_version}"
+    # Create subdirectories: base_dir/{ENV}/{COUNTRY}/{RULESET_KEY}/v{VERSION}/
+    version_dir = base_dir / environment / country / ruleset_key / f"v{ruleset_version}"
 
     # Generate filename
     filename = "ruleset.json"
@@ -218,6 +226,7 @@ class FilesystemBackend:
         self,
         data: bytes,
         environment: str,
+        country: str,
         ruleset_key: str,
         ruleset_version: int,
     ) -> str:
@@ -227,6 +236,7 @@ class FilesystemBackend:
         Args:
             data: Artifact JSON bytes
             environment: Environment name
+            country: Country code
             ruleset_key: Ruleset key
             ruleset_version: Version number
 
@@ -234,8 +244,8 @@ class FilesystemBackend:
             File URI (file://absolute/path)
         """
         base_dir = Path(settings.ruleset_filesystem_dir)
-        # Create versioned directory: {ENV}/{RULESET_KEY}/v{VERSION}/
-        version_dir = base_dir / environment / ruleset_key / f"v{ruleset_version}"
+        # Create versioned directory: {ENV}/{COUNTRY}/{RULESET_KEY}/v{VERSION}/
+        version_dir = base_dir / environment / country / ruleset_key / f"v{ruleset_version}"
         version_dir.mkdir(parents=True, exist_ok=True)
 
         filename = "ruleset.json"
@@ -306,6 +316,7 @@ class S3Backend:
         self,
         data: bytes,
         environment: str,
+        country: str,
         ruleset_key: str,
         ruleset_version: int,
     ) -> str:
@@ -315,6 +326,7 @@ class S3Backend:
         Args:
             data: Artifact JSON bytes
             environment: Environment name
+            country: Country code
             ruleset_key: Ruleset key
             ruleset_version: Version number
 
@@ -325,7 +337,11 @@ class S3Backend:
 
         # Generate key from prefix pattern
         prefix = settings.ruleset_artifact_prefix
-        prefix = prefix.replace("{ENV}", environment).replace("{RULESET_KEY}", ruleset_key)
+        prefix = (
+            prefix.replace("{ENV}", environment)
+            .replace("{COUNTRY}", country)
+            .replace("{RULESET_KEY}", ruleset_key)
+        )
         filename = f"v{ruleset_version}/ruleset.json"
         key = f"{prefix}{filename}".strip("/")
 
@@ -362,8 +378,10 @@ def _generate_manifest_content(
     artifact_uri: str,
     checksum: str,
     published_at: datetime,
+    country: str,
+    region: str,
     field_registry_version: int | None = None,
-    schema_version: str = "1.0",
+    schema_version: str = "1.1",
 ) -> dict[str, Any]:
     """
     Generate the manifest.json content for runtime source-of-truth.
@@ -375,8 +393,10 @@ def _generate_manifest_content(
         artifact_uri: URI to the published artifact
         checksum: SHA-256 checksum of the artifact
         published_at: Timestamp of publication
+        country: Country code (US, IN, GB, etc.)
+        region: Region (APAC, EMEA, INDIA, AMERICAS)
         field_registry_version: Field registry version used for this ruleset
-        schema_version: Manifest schema version (optional, for forward compatibility)
+        schema_version: Manifest schema version (1.1 for country-partitioned paths)
 
     Returns:
         Manifest dictionary with required fields
@@ -384,6 +404,8 @@ def _generate_manifest_content(
     content = {
         "schema_version": schema_version,
         "environment": environment,
+        "region": region,
+        "country": country,
         "ruleset_key": ruleset_key,
         "ruleset_version": ruleset_version,
         "artifact_uri": artifact_uri,
@@ -395,12 +417,13 @@ def _generate_manifest_content(
     return content
 
 
-def _get_manifest_uri(environment: str, ruleset_key: str) -> str:
+def _get_manifest_uri(environment: str, country: str, ruleset_key: str) -> str:
     """
     Generate the URI for the runtime manifest.json pointer file.
 
     Args:
         environment: Environment name (dev, test, prod)
+        country: Country code (US, IN, GB, etc.)
         ruleset_key: Ruleset key (CARD_AUTH or CARD_MONITORING)
 
     Returns:
@@ -410,12 +433,16 @@ def _get_manifest_uri(environment: str, ruleset_key: str) -> str:
 
     if backend == "s3":
         prefix = settings.ruleset_artifact_prefix
-        prefix = prefix.replace("{ENV}", environment).replace("{RULESET_KEY}", ruleset_key)
+        prefix = (
+            prefix.replace("{ENV}", environment)
+            .replace("{COUNTRY}", country)
+            .replace("{RULESET_KEY}", ruleset_key)
+        )
         key = f"{prefix}manifest.json".strip("/")
         return f"s3://{settings.s3_bucket_name}/{key}"
     else:
         base_dir = Path(settings.ruleset_filesystem_dir)
-        manifest_path = base_dir / environment / ruleset_key / "manifest.json"
+        manifest_path = base_dir / environment / country / ruleset_key / "manifest.json"
         return f"file://{manifest_path.resolve()}"
 
 
@@ -431,6 +458,7 @@ class ManifestWriter:
         self,
         manifest_content: dict[str, Any],
         environment: str,
+        country: str,
         ruleset_key: str,
     ) -> str:
         """
@@ -439,13 +467,14 @@ class ManifestWriter:
         Args:
             manifest_content: The manifest dictionary
             environment: Environment name
+            country: Country code
             ruleset_key: Ruleset key
 
         Returns:
             URI to the written manifest file
         """
         backend = settings.ruleset_artifact_backend.lower()
-        manifest_uri = _get_manifest_uri(environment, ruleset_key)
+        manifest_uri = _get_manifest_uri(environment, country, ruleset_key)
 
         if backend == "s3":
             self._write_manifest_to_s3(manifest_content, manifest_uri)
@@ -560,6 +589,7 @@ async def publish_ruleset_version(
         artifact_uri = s3_backend.publish(
             data=artifact_bytes,
             environment=environment,
+            country=ruleset.country,
             ruleset_key=ruleset_key,
             ruleset_version=ruleset_version_num,
         )
@@ -568,6 +598,7 @@ async def publish_ruleset_version(
         artifact_uri = fs_backend.publish(
             data=artifact_bytes,
             environment=environment,
+            country=ruleset.country,
             ruleset_key=ruleset_key,
             ruleset_version=ruleset_version_num,
         )
@@ -608,11 +639,13 @@ async def publish_ruleset_version(
         artifact_uri=artifact_uri,
         checksum=checksum,
         published_at=published_at,
+        country=ruleset.country,
+        region=ruleset.region,
         field_registry_version=field_registry_version,
-        schema_version="1.0",
+        schema_version="1.1",
     )
     manifest_writer = ManifestWriter()
-    manifest_writer.write_manifest(manifest_content, environment, ruleset_key)
+    manifest_writer.write_manifest(manifest_content, environment, ruleset.country, ruleset_key)
 
     logger.info(
         f"Published ruleset version {ruleset_version.ruleset_version_id} as {ruleset_key} "

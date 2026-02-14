@@ -5,7 +5,7 @@
 > This document consolidates and locks all major **runtime, scoping, loading, and hot‑reload design decisions** for the Card Fraud Rule Engine.
 >
 > It is intended to be the **single source of truth** for implementers, reviewers, and future service plans, and should be kept in sync with:
-> - card-fraud-rule-engine implementation
+> - card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring implementation
 > - ruleset publishing contracts
 > - transaction‑management ingestion semantics
 
@@ -258,4 +258,5 @@ Any implementation violating these must be rejected.
 ## 11. Status
 
 This document is **LOCKED** for v1 unless changed via ADR.
+
 

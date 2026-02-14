@@ -14,15 +14,15 @@ Headless mode with report:
     locust -f scripts/load_test_locust.py --host=http://127.0.0.1:8000 --users=20 --spawn-rate=5 --run-time=3m --csv=reports/load_test --csv-full-history
 """
 
-import json
-import random
-import time
 import os
+import random
 import subprocess
-import requests
+import time
 from datetime import datetime
-from locust import HttpUser, task, between, events
 
+import requests
+from locust import HttpUser, between, events, task
+from locust.runners import MasterRunner
 
 # Configuration
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN", "")

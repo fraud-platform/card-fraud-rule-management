@@ -133,7 +133,7 @@ This project creates shared users used by all fraud projects:
 | Project | Secrets to Share |
 |---------|-----------------|
 | `card-fraud-transaction-management` | `FRAUD_GOV_APP_PASSWORD`, `FRAUD_GOV_ADMIN_PASSWORD` |
-| `card-fraud-rule-engine` | `FRAUD_GOV_APP_PASSWORD` |
+| `card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring` | `FRAUD_GOV_APP_PASSWORD` |
 | `card-fraud-intelligence-portal` | `FRAUD_GOV_APP_PASSWORD`, `FRAUD_GOV_ANALYTICS_PASSWORD` |
 
 ### Sharing Passwords with card-fraud-transaction-management
@@ -206,3 +206,4 @@ uv run db-init --yes
 - [Database Setup](database-setup.md) - Database initialization
 - [Auth0 Setup](auth0-setup-guide.md) - Auth0 configuration
 - [AGENTS.md](../../AGENTS.md) - Agent instructions
+

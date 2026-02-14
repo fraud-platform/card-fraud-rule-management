@@ -23,6 +23,7 @@ class AppEnvironment(str, Enum):
     TEST = "test"
     PROD = "prod"
 
+
 # Load an env file ONLY when explicitly requested.
 # This is intentionally opt-in to avoid accidental `.env` usage when
 # running with Doppler secrets.
@@ -88,7 +89,9 @@ class Settings(BaseSettings):
     # Local Development: Skip JWT validation for e2e load testing
     # SECURITY: ONLY allowed in LOCAL environment. Will raise error in TEST/PROD.
     # Set SECURITY_SKIP_JWT_VALIDATION=true in Doppler/.env for local testing
-    skip_jwt_validation: bool = Field(default=False, validation_alias="SECURITY_SKIP_JWT_VALIDATION")
+    skip_jwt_validation: bool = Field(
+        default=False, validation_alias="SECURITY_SKIP_JWT_VALIDATION"
+    )
 
     @field_validator("skip_jwt_validation", mode="before")
     @classmethod
@@ -149,9 +152,9 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
     s3_force_path_style: bool = True
 
-    # S3 artifact prefix pattern (e.g., 'rulesets/{ENV}/{RULESET_KEY}/')
-    # Placeholders: {ENV} -> environment, {RULESET_KEY} -> CARD_AUTH or CARD_MONITORING
-    ruleset_artifact_prefix: str = "rulesets/{ENV}/{RULESET_KEY}/"
+    # S3 artifact prefix pattern (e.g., 'rulesets/{ENV}/{COUNTRY}/{RULESET_KEY}/')
+    # Placeholders: {ENV} -> environment, {COUNTRY} -> country code, {RULESET_KEY} -> CARD_AUTH or CARD_MONITORING
+    ruleset_artifact_prefix: str = "rulesets/{ENV}/{COUNTRY}/{RULESET_KEY}/"
 
     # Filesystem storage configuration (for local development)
     # Local directory to store artifacts when backend is 'filesystem'

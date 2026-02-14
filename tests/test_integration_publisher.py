@@ -38,7 +38,6 @@ from app.repos.ruleset_repo import (
     submit_ruleset_version,
 )
 
-
 # =============================================================================
 # Test Helpers
 # =============================================================================
@@ -66,6 +65,7 @@ def _get_s3_config() -> tuple[str, str]:
 def _get_publish_env() -> str:
     """Get publish environment from settings."""
     return _get_settings().publish_environment
+
 
 # =============================================================================
 # Test Fixtures
@@ -106,12 +106,12 @@ def s3_client():
     return client
 
 
-def _cleanup_test_artifacts(s3_client, ruleset_key: str):
+def _cleanup_test_artifacts(s3_client, ruleset_key: str, country: str = "IN"):
     """Clean up test artifacts from S3."""
     settings = _get_settings()
 
     try:
-        prefix = f"rulesets/{settings.publish_environment}/{ruleset_key}/"
+        prefix = f"rulesets/{settings.publish_environment}/{country}/{ruleset_key}/"
         response = s3_client.list_objects_v2(Bucket=settings.s3_bucket_name, Prefix=prefix)
         if "Contents" in response:
             for obj in response["Contents"]:
@@ -171,7 +171,7 @@ class TestRulesetPublisherE2E:
         # Get fresh settings to ensure we have Doppler-injected values
         settings = _get_settings()
         ruleset_key = "CARD_AUTH"
-        _cleanup_test_artifacts(s3_client, ruleset_key)
+        _cleanup_test_artifacts(s3_client, ruleset_key, "IN")
 
         try:
             # Step 1: Create a RuleVersion (must be APPROVED before attaching)
@@ -302,11 +302,13 @@ class TestRulesetPublisherE2E:
 
             # Verify runtime manifest.json was written
             publish_env = os.environ.get("APP_ENV", "local")
-            manifest_key = f"rulesets/{publish_env}/{ruleset_key}/manifest.json"
+            manifest_key = f"rulesets/{publish_env}/IN/{ruleset_key}/manifest.json"
             manifest_response = s3_client.get_object(Bucket=bucket, Key=manifest_key)
             manifest_content = json.loads(manifest_response["Body"].read().decode("utf-8"))
 
             assert manifest_content["environment"] == publish_env
+            assert manifest_content["country"] == "IN"
+            assert manifest_content["region"] == "APAC"
             assert manifest_content["ruleset_key"] == ruleset_key
             assert manifest_content["ruleset_version"] == 1
             assert manifest_content["artifact_uri"] == manifest.artifact_uri
@@ -314,7 +316,7 @@ class TestRulesetPublisherE2E:
             assert "published_at" in manifest_content
 
         finally:
-            _cleanup_test_artifacts(s3_client, ruleset_key)
+            _cleanup_test_artifacts(s3_client, ruleset_key, "IN")
 
     @pytest.mark.anyio
     async def test_publish_MONITORING_ruleset_to_minio(
@@ -323,7 +325,7 @@ class TestRulesetPublisherE2E:
         """Test MONITORING RuleSet publishing to MinIO."""
         settings = _get_settings()
         ruleset_key = "CARD_MONITORING"
-        _cleanup_test_artifacts(s3_client, ruleset_key)
+        _cleanup_test_artifacts(s3_client, ruleset_key, "IN")
 
         try:
             # Create and approve a MONITORING RuleSet
@@ -427,15 +429,17 @@ class TestRulesetPublisherE2E:
             assert artifact_json["evaluation"]["mode"] == "ALL_MATCHING"
 
             # Verify runtime manifest.json
-            manifest_key = f"rulesets/{settings.publish_environment}/{ruleset_key}/manifest.json"
+            manifest_key = f"rulesets/{settings.publish_environment}/IN/{ruleset_key}/manifest.json"
             manifest_response = s3_client.get_object(Bucket=bucket, Key=manifest_key)
             manifest_content = json.loads(manifest_response["Body"].read().decode("utf-8"))
 
             assert manifest_content["ruleset_key"] == ruleset_key
             assert manifest_content["ruleset_version"] == 1
+            assert manifest_content["country"] == "IN"
+            assert manifest_content["region"] == "APAC"
 
         finally:
-            _cleanup_test_artifacts(s3_client, ruleset_key)
+            _cleanup_test_artifacts(s3_client, ruleset_key, "IN")
 
     @pytest.mark.anyio
     async def test_ALLOWLIST_ruleset_does_not_publish(
@@ -448,7 +452,7 @@ class TestRulesetPublisherE2E:
         """
         settings = _get_settings()
         ruleset_key = "CARD_AUTH"  # For cleanup purposes
-        _cleanup_test_artifacts(s3_client, ruleset_key)
+        _cleanup_test_artifacts(s3_client, ruleset_key, "IN")
 
         try:
             # Create a ALLOWLIST RuleSet
@@ -551,7 +555,7 @@ class TestRulesetPublisherE2E:
         """Test that version numbers increment for each publish."""
         settings = _get_settings()
         ruleset_key = "CARD_AUTH"
-        _cleanup_test_artifacts(s3_client, ruleset_key)
+        _cleanup_test_artifacts(s3_client, ruleset_key, "IN")
 
         try:
             # Helper to create a quick RuleVersion
@@ -689,15 +693,17 @@ class TestRulesetPublisherE2E:
 
             # Verify runtime manifest.json was updated to v2
             bucket = settings.s3_bucket_name
-            manifest_key = f"rulesets/{settings.publish_environment}/{ruleset_key}/manifest.json"
+            manifest_key = f"rulesets/{settings.publish_environment}/IN/{ruleset_key}/manifest.json"
             manifest_response = s3_client.get_object(Bucket=bucket, Key=manifest_key)
             manifest_content = json.loads(manifest_response["Body"].read().decode("utf-8"))
 
             assert manifest_content["ruleset_version"] == 2
             assert manifest_content["artifact_uri"] == m2.artifact_uri
+            assert manifest_content["country"] == "IN"
+            assert manifest_content["region"] == "APAC"
 
         finally:
-            _cleanup_test_artifacts(s3_client, ruleset_key)
+            _cleanup_test_artifacts(s3_client, ruleset_key, "IN")
 
 
 # =============================================================================

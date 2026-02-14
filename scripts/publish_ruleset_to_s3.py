@@ -24,14 +24,11 @@ Prerequisites:
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
 
 import httpx
 
@@ -166,7 +163,7 @@ def get_auth0_tokens(config: Config) -> dict[str, str | None]:
             log(f"Got maker token for {config.maker_username}", "success")
         else:
             log(
-                f"Failed to get maker token - check AUTH0_TEST_CLIENT_ID/SECRET and password grant",
+                "Failed to get maker token - check AUTH0_TEST_CLIENT_ID/SECRET and password grant",
                 "warn",
             )
 
@@ -239,48 +236,6 @@ def fetch_auth0_client_credentials(
     except Exception:
         pass
     return None
-
-    if maker_password:
-        token = fetch_auth0_user_token(
-            domain,
-            audience,
-            test_client_id,
-            test_client_secret,
-            config.maker_username,
-            maker_password,
-        )
-        if token:
-            tokens["maker"] = token
-            log(f"Got maker token for {config.maker_username}", "success")
-        else:
-            log(f"Failed to get maker token", "warn")
-
-    if checker_password:
-        token = fetch_auth0_user_token(
-            domain,
-            audience,
-            test_client_id,
-            test_client_secret,
-            config.checker_username,
-            checker_password,
-        )
-        if token:
-            tokens["checker"] = token
-            log(f"Got checker token for {config.checker_username}", "success")
-
-    if admin_password and test_client_id and test_client_secret:
-        token = fetch_auth0_user_token(
-            domain,
-            audience,
-            test_client_id,
-            test_client_secret,
-            "test-platform-admin@fraud-platform.test",
-            admin_password,
-        )
-        if token:
-            tokens["admin"] = token
-
-    return tokens
 
 
 def ensure_rule_fields(client: httpx.Client, token: str | None, config: Config) -> int:
@@ -627,7 +582,7 @@ def create_realistic_rules(
                             "info",
                         )
                     else:
-                        log(f"  Version created but no version_id returned", "info")
+                        log("  Version created but no version_id returned", "info")
                 else:
                     log(
                         f"  Failed to create version: {version_response.status_code} - {version_response.text[:200]}",
@@ -755,7 +710,7 @@ def submit_ruleset_version(
             headers=headers,
         )
         if response.status_code in [200, 409]:
-            log(f"Submitted ruleset version for approval", "success")
+            log("Submitted ruleset version for approval", "success")
             return True
         else:
             log(f"Failed to submit: {response.status_code}", "warn")
@@ -781,7 +736,7 @@ def approve_ruleset_version(
             headers=headers,
         )
         if response.status_code == 200:
-            log(f"Approved ruleset version - compiled and published to S3!", "success")
+            log("Approved ruleset version - compiled and published to S3!", "success")
             return True
         elif response.status_code == 409:
             error_data = response.json()
@@ -789,7 +744,7 @@ def approve_ruleset_version(
                 "maker" in error_data.get("message", "").lower()
                 or "checker" in error_data.get("message", "").lower()
             ):
-                log(f"Maker=Checker violation - cannot approve own work", "warn")
+                log("Maker=Checker violation - cannot approve own work", "warn")
             else:
                 log(f"Conflict: {error_data}", "warn")
         else:
@@ -845,7 +800,7 @@ def reset_rate_limiter() -> None:
 
         # Call the rate limiter reset endpoint if it exists, or reset via direct DB
         # For now, try to make a request to trigger cleanup
-        httpx.get(f"http://127.0.0.1:8000/api/v1/health", timeout=5)
+        httpx.get("http://127.0.0.1:8000/api/v1/health", timeout=5)
     except Exception:
         pass
 
@@ -914,7 +869,7 @@ async def run_publish(config: Config) -> PublishResult:
         else:
             log("  No AUTH-compatible rules found", "warn")
 
-        log(f"\n--- Summary ---")
+        log("\n--- Summary ---")
         log(f"Total rules: {len(rules)}")
         log(f"AUTH rules: {len(auth_rules)}")
         log(f"Created {len(ruleset_version_ids)} ruleset versions")
@@ -936,9 +891,9 @@ async def run_publish(config: Config) -> PublishResult:
                         result.manifest_uris.append(uri)
                         log(f"S3 Manifest URI: {uri}", "success")
             else:
-                log(f"Skipping approval - maker=checker or no version ID", "warn")
+                log("Skipping approval - maker=checker or no version ID", "warn")
                 log(
-                    f"To enable full workflow, configure AUTH0_TEST_CLIENT with password grant",
+                    "To enable full workflow, configure AUTH0_TEST_CLIENT with password grant",
                     "info",
                 )
 
@@ -995,7 +950,7 @@ def main() -> int:
 
     if result.success:
         log("Publish workflow completed successfully!", "success")
-        print(f"\nRulesets are now available in S3 at:")
+        print("\nRulesets are now available in S3 at:")
         for uri in result.manifest_uris:
             print(f"  - {uri}")
         return 0

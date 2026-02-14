@@ -29,7 +29,7 @@ This document defines the authoritative authentication and authorization model f
 | Project | Type | Responsibility |
 |---------|------|----------------|
 | `card-fraud-rule-management` | FastAPI | Rule authoring, governance, maker-checker workflow |
-| `card-fraud-rule-engine` | Quarkus | Runtime rule execution (machine only) |
+| `card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring` | Quarkus | Runtime rule execution (machine only) |
 | `card-fraud-transaction-management` | FastAPI | Fraud operations & case handling |
 | `card-fraud-intelligence-portal` | React SPA | Unified human UI |
 
@@ -429,7 +429,7 @@ if ruleset.created_by == current_user.sub:
 - Audit all state transitions
 - Create shared roles + permissions in Auth0
 
-### card-fraud-rule-engine
+### card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring
 
 - **No human tokens allowed**
 - Accept only M2M tokens with execution scopes
@@ -547,7 +547,7 @@ cd <path-to>/card-fraud-rule-management
 uv run auth0-bootstrap --yes --verbose
 
 # Rule Engine (scope-based only)
-cd <path-to>/card-fraud-rule-engine
+cd <path-to>/card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring
 uv run auth0-bootstrap --yes --verbose
 
 # Transaction Management (uses shared roles)
@@ -582,7 +582,7 @@ AUTH0_AUDIENCE: https://fraud-rule-management-api
 AUTH0_CLIENT_ID: <rule-mgmt-m2m-id>
 AUTH0_CLIENT_SECRET: <rule-mgmt-m2m-secret>
 
-# card-fraud-rule-engine
+# card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring
 AUTH0_AUDIENCE: https://fraud-rule-engine-api
 AUTH0_CLIENT_ID: <rule-engine-m2m-id>
 AUTH0_CLIENT_SECRET: <rule-engine-m2m-secret>
@@ -623,3 +623,4 @@ When implementing this auth model, the following code changes are required:
 ---
 
 **End of Document**
+

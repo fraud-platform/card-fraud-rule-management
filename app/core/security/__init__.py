@@ -41,9 +41,6 @@ from .jwt_verification import (
     verify_token,
     verify_token_async,
 )
-
-# Alias for backward compatibility
-security = _optional_security
 from .permissions import (
     M2M_PERMISSIONS,
     require_permission,
@@ -58,6 +55,9 @@ from .utils import (
     has_permission,
     is_m2m_token,
 )
+
+# Alias for backward compatibility
+security = _optional_security
 
 logger = logging.getLogger(__name__)
 

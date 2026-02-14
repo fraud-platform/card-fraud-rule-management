@@ -426,11 +426,14 @@ class TestURIGeneration:
     async def test_generate_s3_uri_includes_all_components(self):
         """Test S3 URI includes bucket, environment, key, and version."""
         with patch.object(settings, "s3_bucket_name", "test-bucket"):
-            with patch.object(settings, "ruleset_artifact_prefix", "rulesets/{ENV}/{RULESET_KEY}/"):
-                result = _generate_s3_uri("test", "CARD_AUTH", 3)
+            with patch.object(
+                settings, "ruleset_artifact_prefix", "rulesets/{ENV}/{COUNTRY}/{RULESET_KEY}/"
+            ):
+                result = _generate_s3_uri("test", "US", "CARD_AUTH", 3)
 
         assert result.startswith("s3://test-bucket/")
         assert "rulesets/test/" in result
+        assert "US/" in result
         assert "CARD_AUTH/" in result
         assert "v3/" in result
         assert "ruleset.json" in result
@@ -440,12 +443,13 @@ class TestURIGeneration:
     async def test_generate_file_uri_is_absolute(self):
         """Test filesystem URI is absolute."""
         with patch.object(settings, "ruleset_filesystem_dir", ".local/ruleset-artifacts"):
-            result = _generate_file_uri("dev", "CARD_MONITORING", 1)
+            result = _generate_file_uri("dev", "US", "CARD_MONITORING", 1)
 
         # On Windows: file://C:\path, on Unix: file:///path
         assert result.startswith("file://")
         assert "ruleset-artifacts" in result or ".local" in result
         assert "dev" in result
+        assert "US" in result
         assert "v1" in result
         assert "ruleset.json" in result
 
@@ -455,12 +459,13 @@ class TestURIGeneration:
         """Test S3 URI generation with custom prefix."""
         with patch.object(settings, "s3_bucket_name", "custom-bucket"):
             with patch.object(
-                settings, "ruleset_artifact_prefix", "custom/path/{ENV}/{RULESET_KEY}/"
+                settings, "ruleset_artifact_prefix", "custom/path/{ENV}/{COUNTRY}/{RULESET_KEY}/"
             ):
-                result = _generate_s3_uri("prod", "CARD_MONITORING", 5)
+                result = _generate_s3_uri("prod", "IN", "CARD_MONITORING", 5)
 
         assert result.startswith("s3://custom-bucket/custom/path/")
         assert "prod/" in result
+        assert "IN/" in result
         assert "CARD_MONITORING/" in result
         assert "v5/" in result
         assert "ruleset.json" in result
@@ -470,10 +475,11 @@ class TestURIGeneration:
     async def test_generate_file_uri_creates_expected_path_structure(self, tmp_path):
         """Test file URI generates correct path structure."""
         with patch.object(settings, "ruleset_filesystem_dir", str(tmp_path)):
-            result = _generate_file_uri("dev", "CARD_AUTH", 2)
+            result = _generate_file_uri("dev", "GB", "CARD_AUTH", 2)
 
         # Verify path contains all components
         assert "dev" in result
+        assert "GB" in result
         assert "CARD_AUTH" in result
         assert "v2" in result
         assert "ruleset.json" in result
@@ -495,10 +501,10 @@ class TestFilesystemBackend:
             backend = FilesystemBackend()
             data = b'{"test": "data"}'
 
-            result = backend.publish(data, "local", "CARD_AUTH", 1)
+            result = backend.publish(data, "local", "US", "CARD_AUTH", 1)
 
             # Check directory was created with versioned path
-            version_dir = tmp_path / "local" / "CARD_AUTH" / "v1"
+            version_dir = tmp_path / "local" / "US" / "CARD_AUTH" / "v1"
             assert version_dir.exists()
 
             # Check file was created
@@ -520,7 +526,7 @@ class TestFilesystemBackend:
             backend = FilesystemBackend()
             data = b'{"test": "data"}'
 
-            result = backend.publish(data, "local", "CARD_AUTH", 1)
+            result = backend.publish(data, "local", "IN", "CARD_AUTH", 1)
 
             # On Windows: file://C:\path, on Unix: file:///path
             assert result.startswith("file://")
@@ -533,10 +539,10 @@ class TestFilesystemBackend:
             backend = FilesystemBackend()
             data = b'{"version": 1}'
 
-            backend.publish(data, "local", "CARD_AUTH", 1)
+            backend.publish(data, "local", "US", "CARD_AUTH", 1)
 
             # Verify versioned directory exists
-            version_dir = tmp_path / "local" / "CARD_AUTH" / "v1"
+            version_dir = tmp_path / "local" / "US" / "CARD_AUTH" / "v1"
             assert version_dir.exists()
             assert (version_dir / "ruleset.json").exists()
 
@@ -548,10 +554,10 @@ class TestFilesystemBackend:
             backend = FilesystemBackend()
             data = b'{"test": "data"}'
 
-            backend.publish(data, "dev", "CARD_AUTH", 1)
+            backend.publish(data, "dev", "IN", "CARD_AUTH", 1)
 
             # Verify nested directories were created
-            version_dir = tmp_path / "dev" / "CARD_AUTH" / "v1"
+            version_dir = tmp_path / "dev" / "IN" / "CARD_AUTH" / "v1"
             assert version_dir.exists()
 
     @pytest.mark.anyio
@@ -577,7 +583,7 @@ class TestFilesystemBackend:
             # Try to create a subdirectory in read-only dir
             # This should raise an error
             try:
-                backend.publish(b"data", "test", "CARD_AUTH", 1)
+                backend.publish(b"data", "test", "US", "CARD_AUTH", 1)
                 # If we get here, the OS allowed the write (Windows sometimes does)
                 # Clean up and skip
                 os.chmod(readonly_dir, stat.S_IRWXU)
@@ -711,11 +717,12 @@ class TestS3Backend:
                                     with patch.object(
                                         settings,
                                         "ruleset_artifact_prefix",
-                                        "rulesets/{ENV}/{RULESET_KEY}/",
+                                        "rulesets/{ENV}/{COUNTRY}/{RULESET_KEY}/",
                                     ):
                                         result = backend.publish(
                                             b'{"test": "data"}',
                                             "test",
+                                            "US",
                                             "CARD_AUTH",
                                             1,
                                         )
@@ -729,7 +736,7 @@ class TestS3Backend:
         assert result.startswith("s3://test-bucket/")
         # Verify key structure
         key = call_args[1]["Key"]
-        assert "rulesets/test/CARD_AUTH/v1/ruleset.json" == key
+        assert "rulesets/test/US/CARD_AUTH/v1/ruleset.json" == key
 
     @pytest.mark.anyio
     @pytest.mark.anyio
@@ -755,7 +762,7 @@ class TestS3Backend:
                                         settings, "ruleset_artifact_prefix", "rulesets/"
                                     ):
                                         with pytest.raises(CompilationError) as exc:
-                                            backend.publish(b"data", "test", "CARD_AUTH", 1)
+                                            backend.publish(b"data", "test", "US", "CARD_AUTH", 1)
 
                                         assert "Failed to publish artifact to S3" in str(exc.value)
                                         assert exc.value.details["bucket"] == "test-bucket"
@@ -785,7 +792,7 @@ class TestS3Backend:
                                         settings, "ruleset_artifact_prefix", "rulesets/"
                                     ):
                                         with pytest.raises(CompilationError) as exc:
-                                            backend.publish(b"data", "test", "CARD_AUTH", 1)
+                                            backend.publish(b"data", "test", "US", "CARD_AUTH", 1)
 
                                         assert "Failed to publish artifact to S3" in str(exc.value)
 
@@ -811,16 +818,16 @@ class TestS3Backend:
                                     with patch.object(
                                         settings,
                                         "ruleset_artifact_prefix",
-                                        "rulesets/{ENV}/{RULESET_KEY}/",
+                                        "rulesets/{ENV}/{COUNTRY}/{RULESET_KEY}/",
                                     ):
                                         result = backend.publish(
-                                            b"data", "prod", "CARD_MONITORING", 3
+                                            b"data", "prod", "IN", "CARD_MONITORING", 3
                                         )
 
             # Verify the S3 key structure
             call_args = mock_client.put_object.call_args
             key = call_args[1]["Key"]
-            expected_key = "rulesets/prod/CARD_MONITORING/v3/ruleset.json"
+            expected_key = "rulesets/prod/IN/CARD_MONITORING/v3/ruleset.json"
             assert key == expected_key, f"Expected {expected_key}, got {key}"
             assert result == f"s3://my-bucket/{expected_key}"
 

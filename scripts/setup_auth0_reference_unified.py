@@ -6,7 +6,7 @@ THIS IS A REFERENCE IMPLEMENTATION FOR FUTURE USE - NOT CURRENTLY ACTIVE
 
 The current PRODUCTION approach uses SEPARATE scripts per project:
 - card-fraud-rule-management/scripts/setup_auth0.py  (creates all shared resources)
-- card-fraud-rule-engine/scripts/setup_auth0.py      (creates API + M2M only)
+- card-fraud-rule-engine-auth/scripts/setup_auth0.py      (creates API + M2M only)
 - card-fraud-transaction-management/scripts/setup_auth0.py (creates API + M2M only)
 
 This unified script is kept as a REFERENCE for potential future consolidation.
@@ -59,7 +59,7 @@ The Card Fraud Platform consists of 4 projects sharing a single Auth0 tenant:
 
 BOOTSTRAP ORDER (CRITICAL):
 1. card-fraud-rule-management (FIRST - creates shared resources)
-2. card-fraud-rule-engine (creates its own API + M2M)
+2. card-fraud-rule-engine-auth (creates its own API + M2M)
 3. card-fraud-transaction-management (creates its own API + M2M)
 4. card-fraud-intelligence-portal (no Auth0 setup needed - uses SPA from step 1)
 
@@ -219,8 +219,8 @@ PROJECT_CONFIGS: dict[str, ProjectConfig] = {
         spa_name="Fraud Intelligence Portal",
         roles=PLATFORM_ROLES,
     ),
-    "card-fraud-rule-engine": ProjectConfig(
-        project_name="card-fraud-rule-engine",
+    "card-fraud-rule-engine-auth": ProjectConfig(
+        project_name="card-fraud-rule-engine-auth",
         api_audience="https://fraud-rule-engine-api",
         api_name="Fraud Rule Engine API",
         m2m_name="Fraud Rule Engine M2M",
@@ -322,7 +322,7 @@ def sync_test_passwords_to_all_projects(
     """Sync test user passwords to all Doppler projects (local + test configs)."""
     projects = [
         "card-fraud-rule-management",
-        "card-fraud-rule-engine",
+        "card-fraud-rule-engine-auth",
         "card-fraud-transaction-management",
         "card-fraud-intelligence-portal",
     ]
@@ -1059,3 +1059,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

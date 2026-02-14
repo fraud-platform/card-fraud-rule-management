@@ -229,7 +229,9 @@ class ExpectCondition:
             for path, expected_contains in self.json_path_contains.items():
                 value = self._get_json_value(response_json, path)
                 if isinstance(value, str) and expected_contains not in value:
-                    errors.append(f"JSON path '{path}' = '{value}' does not contain '{expected_contains}'")
+                    errors.append(
+                        f"JSON path '{path}' = '{value}' does not contain '{expected_contains}'"
+                    )
                 elif isinstance(value, list) and expected_contains not in value:
                     errors.append(f"JSON path '{path}' list does not contain '{expected_contains}'")
 
@@ -237,13 +239,17 @@ class ExpectCondition:
             for path, pattern in self.json_path_regex.items():
                 value = self._get_json_value(response_json, path)
                 if value is None or not re.match(pattern, str(value)):
-                    errors.append(f"JSON path '{path}' = '{value}' does not match pattern '{pattern}'")
+                    errors.append(
+                        f"JSON path '{path}' = '{value}' does not match pattern '{pattern}'"
+                    )
 
         # Check content type
         if self.content_type:
             content_type_header = getattr(response, "headers", {}).get("content-type", "")
             if self.content_type not in content_type_header:
-                errors.append(f"Content-Type '{content_type_header}' does not contain '{self.content_type}'")
+                errors.append(
+                    f"Content-Type '{content_type_header}' does not contain '{self.content_type}'"
+                )
 
         return len(errors) == 0, errors
 
@@ -272,7 +278,9 @@ class DbAssertion:
 
             # Check row count expectation
             if self.expect_row_count is not None:
-                row_count = cursor.rowcount if hasattr(cursor, "rowcount") else len(cursor.fetchall())
+                row_count = (
+                    cursor.rowcount if hasattr(cursor, "rowcount") else len(cursor.fetchall())
+                )
                 if row_count != self.expect_row_count:
                     return False, f"Expected {self.expect_row_count} rows, got {row_count}"
 

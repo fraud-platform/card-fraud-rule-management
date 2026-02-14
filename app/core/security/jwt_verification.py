@@ -272,9 +272,7 @@ async def get_current_user(
     # Local development bypass - ONLY allowed in LOCAL environment
     # Validation is enforced in config.py to prevent production use
     if settings.skip_jwt_validation:
-        logger.info(
-            "JWT validation bypassed - returning mock admin user for local development"
-        )
+        logger.info("JWT validation bypassed - returning mock admin user for local development")
         return _create_bypass_user()
 
     # Normal JWT validation flow

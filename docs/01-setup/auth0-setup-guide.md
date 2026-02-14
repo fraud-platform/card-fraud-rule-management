@@ -139,8 +139,8 @@ uv sync
 uv run auth0-bootstrap --yes --verbose
 
 # Rule Engine
-cd C:\Users\kanna\github\card-fraud-rule-engine
-doppler setup --project card-fraud-rule-engine --config local
+cd C:\Users\kanna\github\card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring
+doppler setup --project card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring --config local
 uv sync
 uv run auth0-bootstrap --yes --verbose
 
@@ -437,3 +437,4 @@ doppler secrets set --project card-fraud-intelligence-portal --config local \
 ---
 
 **End of Document**
+
