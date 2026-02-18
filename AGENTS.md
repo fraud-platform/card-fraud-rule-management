@@ -120,6 +120,7 @@ Auth0 reference docs:
 4. Compiler output must be deterministic (same input => same bytes).
 5. Maker-checker invariant: maker cannot approve own submission.
 6. Authorization is permission-based (`require_permission(...)`).
+7. HTTP metrics route labels must use route templates (never raw request paths).
 
 Rule type -> evaluation mode mapping:
 - `ALLOWLIST` -> `FIRST_MATCH`

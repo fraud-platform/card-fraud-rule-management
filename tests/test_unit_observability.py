@@ -300,6 +300,41 @@ class TestObservabilityMiddleware:
         assert "region=" in metrics_output  # Region label should be present
 
     @pytest.mark.anyio
+    async def test_middleware_uses_route_template_for_path_params(self):
+        """Test that middleware metrics use route templates for path params."""
+        app = FastAPI()
+        app.add_middleware(ObservabilityMiddleware)
+
+        @app.get("/rules/{rule_id}")
+        async def get_rule(rule_id: str):
+            return {"rule_id": rule_id}
+
+        client = TestClient(app)
+        response = client.get("/rules/0195f0fd-aaaa-7bbb-8ccc-0123456789ab")
+        assert response.status_code == 200
+
+        metrics_output = generate_latest(metrics.registry).decode("utf-8")
+        assert 'route="/rules/{rule_id}"' in metrics_output
+        assert 'route="/rules/0195f0fd-aaaa-7bbb-8ccc-0123456789ab"' not in metrics_output
+
+    @pytest.mark.anyio
+    async def test_middleware_uses_unmatched_label_for_404s(self):
+        """Test that unmatched paths produce bounded route labels."""
+        app = FastAPI()
+        app.add_middleware(ObservabilityMiddleware)
+
+        @app.get("/health")
+        async def health():
+            return {"status": "ok"}
+
+        client = TestClient(app)
+        response = client.get("/does-not-exist/12345")
+        assert response.status_code == 404
+
+        metrics_output = generate_latest(metrics.registry).decode("utf-8")
+        assert 'route="__unmatched__"' in metrics_output
+
+    @pytest.mark.anyio
     async def test_middleware_skips_logging_for_health_endpoints(self):
         """Test that middleware skips detailed logging for health endpoints."""
         app = FastAPI()

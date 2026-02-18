@@ -2,6 +2,8 @@
 
 FastAPI control-plane service for rule authoring, approvals, and artifact publishing.
 
+Observability note: HTTP metrics labels use normalized route templates (no raw path labels).
+
 ## Quick Start
 
 ```powershell

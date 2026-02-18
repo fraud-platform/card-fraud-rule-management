@@ -29,6 +29,7 @@ from typing import Any
 from fastapi import Request, Response
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.routing import Match
 from starlette.types import ASGIApp
 
 # ============================================================================
@@ -423,6 +424,40 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         self.metrics = metrics_instance or metrics
         self.skip_paths = set(skip_paths or ["/health", "/readyz", "/metrics"])
 
+    @staticmethod
+    def _route_path(route: object | None) -> str | None:
+        route_path = getattr(route, "path", None)
+        if isinstance(route_path, str) and route_path:
+            return route_path
+        return None
+
+    def _resolve_route_pattern(self, request: Request) -> str:
+        route_path = self._route_path(request.scope.get("route"))
+        if route_path:
+            return route_path
+
+        route_path = self._route_path(getattr(request.state, "route", None))
+        if route_path:
+            return route_path
+
+        router = getattr(request.app, "router", None)
+        routes = getattr(router, "routes", None)
+        if not routes:
+            return "__unmatched__"
+
+        partial_match_path: str | None = None
+        for route in routes:
+            match, _ = route.matches(request.scope)
+            route_path = self._route_path(route)
+            if not route_path:
+                continue
+            if match == Match.FULL:
+                return route_path
+            if match == Match.PARTIAL and partial_match_path is None:
+                partial_match_path = route_path
+
+        return partial_match_path or "__unmatched__"
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """
         Process request with observability enhancements.
@@ -451,9 +486,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                 user_id = user_obj.get("sub", "anonymous")
                 set_user_id(user_id)
 
-        # Get route pattern for metrics (fallback to path for no-match)
-        route = getattr(request.state, "route", None)
-        route_pattern = route.path if route else request.url.path
+        route_pattern = self._resolve_route_pattern(request)
 
         # Get region for metrics labeling (P0 requirement)
         region = get_region() or "unknown"

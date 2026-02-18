@@ -20,6 +20,8 @@ FastAPI control-plane service for rule authoring, approvals, and artifact publis
 - `uv run doppler-local`
 - `uv run doppler-local-test`
 
+HTTP metrics labels are normalized to route templates to avoid high-cardinality labels.
+
 ## Platform Modes
 
 - Standalone mode: run this repository with its own local commands and Doppler config.
