@@ -123,6 +123,38 @@ CORS_ORIGINS:
     - Must include the protocol (https://)
 
 # ============================================================================
+# OPENTELEMETRY / JAEGER TRACING (Per-environment)
+# ============================================================================
+
+OTEL_ENABLED:
+  description: Enable OpenTelemetry distributed tracing
+  local: "true"
+  test: "true"
+  prod: "true"
+  required: true
+
+OTEL_SERVICE_NAME:
+  description: Service name for tracing (should match Prometheus job name)
+  local: fraud-governance-api
+  test: fraud-governance-api
+  prod: fraud-governance-api
+  required: true
+
+OTEL_EXPORTER_OTLP_ENDPOINT:
+  description: Jaeger OTLP endpoint for tracing
+  local: http://jaeger:4317
+  test: http://jaeger:4317
+  prod: http://jaeger:4317
+  required: true
+
+OTEL_TRACES_SAMPLER:
+  description: Trace sampling strategy
+  local: parent_trace_always
+  test: parent_trace_always
+  prod: parent_trace_always
+  required: true
+
+# ============================================================================
 # NOT IN DOPPLER (Hardcoded Defaults)
 # ============================================================================
 #

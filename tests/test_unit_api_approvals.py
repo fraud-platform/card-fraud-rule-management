@@ -28,23 +28,23 @@ class TestListApprovals:
     ):
         """Test listing all approvals."""
         # Create a rule and submit for approval (creates approval record)
-        create_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        create_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = create_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
         # Submit for approval
-        async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
+        await async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
 
         # List approvals
-        response = async_maker_client.get("/api/v1/approvals")
+        response = await async_maker_client.get("/api/v1/approvals")
 
         assert response.status_code == 200
         data = response.json()
@@ -73,22 +73,22 @@ class TestListApprovals:
     ):
         """Test filtering approvals by status."""
         # Create and submit rule version
-        create_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        create_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = create_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
-        async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
+        await async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
 
         # Filter by PENDING status
-        response = async_maker_client.get("/api/v1/approvals?status=PENDING")
+        response = await async_maker_client.get("/api/v1/approvals?status=PENDING")
 
         assert response.status_code == 200
         data = response.json()
@@ -101,28 +101,30 @@ class TestListApprovals:
     ):
         """Test filtering approvals by entity type."""
         # Create rule version approval
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
-        async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
+        await async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
 
         # Create ruleset approval
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
-        async_maker_client.post(f"/api/v1/rulesets/{ruleset_id}/submit", json={})
+        await async_maker_client.post(f"/api/v1/rulesets/{ruleset_id}/submit", json={})
 
         # Filter by RULE_VERSION entity type
-        response = async_maker_client.get("/api/v1/approvals?entity_type=RULE_VERSION")
+        response = await async_maker_client.get("/api/v1/approvals?entity_type=RULE_VERSION")
 
         assert response.status_code == 200
         data = response.json()
@@ -130,7 +132,7 @@ class TestListApprovals:
         assert all(a["entity_type"] == "RULE_VERSION" for a in items)
 
         # Filter by RULESET_VERSION entity type
-        response = async_maker_client.get("/api/v1/approvals?entity_type=RULESET_VERSION")
+        response = await async_maker_client.get("/api/v1/approvals?entity_type=RULESET_VERSION")
 
         assert response.status_code == 200
         data = response.json()
@@ -143,22 +145,22 @@ class TestListApprovals:
     ):
         """Test combining multiple filters."""
         # Create and submit rule version
-        create_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        create_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = create_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
-        async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
+        await async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
 
         # Filter by both status and entity_type
-        response = async_maker_client.get(
+        response = await async_maker_client.get(
             "/api/v1/approvals?status=PENDING&entity_type=RULE_VERSION"
         )
 
@@ -175,7 +177,7 @@ class TestListApprovals:
         self, async_maker_client: TestClient, clean_async_db_session
     ):
         """Test listing when no approvals exist."""
-        response = async_maker_client.get("/api/v1/approvals")
+        response = await async_maker_client.get("/api/v1/approvals")
 
         assert response.status_code == 200
         data = response.json()
@@ -193,25 +195,25 @@ class TestListApprovals:
     ):
         """Test approval status changes after approval."""
         # Create and submit rule version
-        create_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        create_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = create_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
-        async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
+        await async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
 
         # Approve
-        async_checker_client.post(f"/api/v1/rule-versions/{version_id}/approve", json={})
+        await async_checker_client.post(f"/api/v1/rule-versions/{version_id}/approve", json={})
 
         # Check approval status
-        response = async_maker_client.get("/api/v1/approvals?status=APPROVED")
+        response = await async_maker_client.get("/api/v1/approvals?status=APPROVED")
 
         assert response.status_code == 200
         data = response.json()
@@ -233,25 +235,25 @@ class TestListApprovals:
     ):
         """Test approval status changes after rejection."""
         # Create and submit rule version
-        create_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        create_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = create_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
-        async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
+        await async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
 
         # Reject
-        async_checker_client.post(f"/api/v1/rule-versions/{version_id}/reject", json={})
+        await async_checker_client.post(f"/api/v1/rule-versions/{version_id}/reject", json={})
 
         # Check approval status
-        response = async_maker_client.get("/api/v1/approvals?status=REJECTED")
+        response = await async_maker_client.get("/api/v1/approvals?status=REJECTED")
 
         assert response.status_code == 200
         data = response.json()
@@ -268,10 +270,10 @@ class TestListAuditLog:
     ):
         """Test listing all audit log entries."""
         # Create a field (creates audit log entry)
-        async_admin_client.post("/api/v1/rule-fields", json=sample_rule_field_data)
+        await async_admin_client.post("/api/v1/rule-fields", json=sample_rule_field_data)
 
         # List audit logs
-        response = async_admin_client.get("/api/v1/audit-log")
+        response = await async_admin_client.get("/api/v1/audit-log")
 
         assert response.status_code == 200
         data = response.json()
@@ -296,10 +298,10 @@ class TestListAuditLog:
     ):
         """Test filtering audit logs by entity type."""
         # Create a field
-        async_admin_client.post("/api/v1/rule-fields", json=sample_rule_field_data)
+        await async_admin_client.post("/api/v1/rule-fields", json=sample_rule_field_data)
 
         # Filter by RULE_FIELD entity type
-        response = async_admin_client.get("/api/v1/audit-log?entity_type=RULE_FIELD")
+        response = await async_admin_client.get("/api/v1/audit-log?entity_type=RULE_FIELD")
 
         assert response.status_code == 200
         data = response.json()
@@ -312,19 +314,19 @@ class TestListAuditLog:
     ):
         """Test filtering audit logs by action."""
         # Create a field (CREATE action)
-        create_response = async_admin_client.post(
+        create_response = await async_admin_client.post(
             "/api/v1/rule-fields", json=sample_rule_field_data
         )
         field_key = create_response.json()["field_key"]
 
         # Update the field (UPDATE action)
-        async_admin_client.patch(
+        await async_admin_client.patch(
             f"/api/v1/rule-fields/{field_key}",
             json={"display_name": "Updated Name"},
         )
 
         # Filter by CREATE action
-        response = async_admin_client.get("/api/v1/audit-log?action=CREATE")
+        response = await async_admin_client.get("/api/v1/audit-log?action=CREATE")
 
         assert response.status_code == 200
         data = response.json()
@@ -332,7 +334,7 @@ class TestListAuditLog:
         assert all(log["action"] == "CREATE" for log in items)
 
         # Filter by UPDATE action
-        response = async_admin_client.get("/api/v1/audit-log?action=UPDATE")
+        response = await async_admin_client.get("/api/v1/audit-log?action=UPDATE")
 
         assert response.status_code == 200
         data = response.json()
@@ -345,11 +347,11 @@ class TestListAuditLog:
     ):
         """Test filtering audit logs by user."""
         # Create a field
-        async_admin_client.post("/api/v1/rule-fields", json=sample_rule_field_data)
+        await async_admin_client.post("/api/v1/rule-fields", json=sample_rule_field_data)
 
         # Filter by user
         user_id = mock_admin["sub"]
-        response = async_admin_client.get(f"/api/v1/audit-log?performed_by={user_id}")
+        response = await async_admin_client.get(f"/api/v1/audit-log?performed_by={user_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -362,14 +364,14 @@ class TestListAuditLog:
     ):
         """Test filtering audit logs by date range."""
         # Create a field
-        async_admin_client.post("/api/v1/rule-fields", json=sample_rule_field_data)
+        await async_admin_client.post("/api/v1/rule-fields", json=sample_rule_field_data)
 
         # Filter by date (since yesterday)
         from datetime import datetime, timedelta
 
         since = (datetime.now(UTC) - timedelta(days=1)).isoformat()
 
-        response = async_admin_client.get(f"/api/v1/audit-log?since={since}")
+        response = await async_admin_client.get(f"/api/v1/audit-log?since={since}")
 
         assert response.status_code == 200
         data = response.json()
@@ -384,10 +386,10 @@ class TestListAuditLog:
         # Create multiple fields
         for i in range(5):
             field_data = {**sample_rule_field_data, "field_key": f"field_{i}"}
-            async_admin_client.post("/api/v1/rule-fields", json=field_data)
+            await async_admin_client.post("/api/v1/rule-fields", json=field_data)
 
         # Limit to 3 entries (using keyset pagination limit parameter)
-        response = async_admin_client.get("/api/v1/audit-log?limit=3")
+        response = await async_admin_client.get("/api/v1/audit-log?limit=3")
 
         assert response.status_code == 200
         data = response.json()
@@ -401,19 +403,19 @@ class TestListAuditLog:
     ):
         """Test that UPDATE actions show before/after state."""
         # Create a field
-        create_response = async_admin_client.post(
+        create_response = await async_admin_client.post(
             "/api/v1/rule-fields", json=sample_rule_field_data
         )
         field_key = create_response.json()["field_key"]
 
         # Update the field
-        async_admin_client.patch(
+        await async_admin_client.patch(
             f"/api/v1/rule-fields/{field_key}",
             json={"display_name": "Updated Name"},
         )
 
         # Get audit logs for UPDATE
-        response = async_admin_client.get("/api/v1/audit-log?action=UPDATE")
+        response = await async_admin_client.get("/api/v1/audit-log?action=UPDATE")
 
         assert response.status_code == 200
         data = response.json()
@@ -432,7 +434,7 @@ class TestListAuditLog:
     async def test_should_return_empty_list_when_no_logs(self, async_admin_client: TestClient):
         """Test listing when no audit logs exist."""
         # Filter by non-existent user
-        response = async_admin_client.get("/api/v1/audit-log?performed_by=nonexistent-user")
+        response = await async_admin_client.get("/api/v1/audit-log?performed_by=nonexistent-user")
 
         assert response.status_code == 200
         data = response.json()
@@ -450,27 +452,27 @@ class TestApprovalWorkflow:
     ):
         """Test that submitting creates an approval record."""
         # Create and submit rule version
-        create_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        create_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = create_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
         # Before submission
-        approvals_before = async_maker_client.get("/api/v1/approvals").json()
+        approvals_before = (await async_maker_client.get("/api/v1/approvals")).json()
         initial_count = len(approvals_before["items"])
 
         # Submit for approval
-        async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
+        await async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
 
         # After submission
-        approvals_after = async_maker_client.get("/api/v1/approvals").json()
+        approvals_after = (await async_maker_client.get("/api/v1/approvals")).json()
 
         assert len(approvals_after["items"]) == initial_count + 1
 
@@ -480,22 +482,22 @@ class TestApprovalWorkflow:
     ):
         """Test that maker is tracked in approval."""
         # Create and submit rule version
-        create_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        create_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = create_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
-        async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
+        await async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
 
         # Get approval
-        approvals = async_maker_client.get("/api/v1/approvals").json()
+        approvals = (await async_maker_client.get("/api/v1/approvals")).json()
         items = approvals["items"]
         approval = next((a for a in items if a["entity_id"] == version_id), None)
 
@@ -512,25 +514,25 @@ class TestApprovalWorkflow:
     ):
         """Test that checker is tracked on approval."""
         # Create and submit rule version
-        create_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        create_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = create_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
-        async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
+        await async_maker_client.post(f"/api/v1/rule-versions/{version_id}/submit", json={})
 
         # Approve
-        async_checker_client.post(f"/api/v1/rule-versions/{version_id}/approve", json={})
+        await async_checker_client.post(f"/api/v1/rule-versions/{version_id}/approve", json={})
 
         # Get approval
-        approvals = async_checker_client.get("/api/v1/approvals").json()
+        approvals = (await async_checker_client.get("/api/v1/approvals")).json()
         items = approvals["items"]
         approval = next((a for a in items if a["entity_id"] == version_id), None)
 
@@ -547,10 +549,10 @@ class TestAuditTrailCompleteness:
         self, async_admin_client: TestClient, sample_rule_field_data: dict
     ):
         """Test that rule field creation is audited."""
-        async_admin_client.post("/api/v1/rule-fields", json=sample_rule_field_data)
+        await async_admin_client.post("/api/v1/rule-fields", json=sample_rule_field_data)
 
-        logs = async_admin_client.get(
-            "/api/v1/audit-log?action=CREATE&entity_type=RULE_FIELD"
+        logs = (
+            await async_admin_client.get("/api/v1/audit-log?action=CREATE&entity_type=RULE_FIELD")
         ).json()
         items = logs["items"]
 
@@ -565,18 +567,18 @@ class TestAuditTrailCompleteness:
         self, async_admin_client: TestClient, sample_rule_field_data: dict
     ):
         """Test that rule field updates are audited."""
-        create_response = async_admin_client.post(
+        create_response = await async_admin_client.post(
             "/api/v1/rule-fields", json=sample_rule_field_data
         )
         field_key = create_response.json()["field_key"]
 
-        async_admin_client.patch(
+        await async_admin_client.patch(
             f"/api/v1/rule-fields/{field_key}",
             json={"display_name": "Updated"},
         )
 
-        logs = async_admin_client.get(
-            "/api/v1/audit-log?action=UPDATE&entity_type=RULE_FIELD"
+        logs = (
+            await async_admin_client.get("/api/v1/audit-log?action=UPDATE&entity_type=RULE_FIELD")
         ).json()
         items = logs["items"]
 
@@ -587,19 +589,21 @@ class TestAuditTrailCompleteness:
         self, async_admin_client: TestClient, sample_rule_field_data: dict
     ):
         """Test that metadata operations are audited."""
-        create_response = async_admin_client.post(
+        create_response = await async_admin_client.post(
             "/api/v1/rule-fields", json=sample_rule_field_data
         )
         field_key = create_response.json()["field_key"]
 
         # Create metadata
         metadata_payload = {"meta_value": {"key": "value"}}
-        async_admin_client.put(
+        await async_admin_client.put(
             f"/api/v1/rule-fields/{field_key}/metadata/test",
             json=metadata_payload,
         )
 
-        logs = async_admin_client.get("/api/v1/audit-log?entity_type=RULE_FIELD_METADATA").json()
+        logs = (
+            await async_admin_client.get("/api/v1/audit-log?entity_type=RULE_FIELD_METADATA")
+        ).json()
         items = logs["items"]
 
         assert len(items) > 0
@@ -609,23 +613,25 @@ class TestAuditTrailCompleteness:
         self, async_admin_client: TestClient, sample_rule_field_data: dict
     ):
         """Test that metadata deletion is audited."""
-        create_response = async_admin_client.post(
+        create_response = await async_admin_client.post(
             "/api/v1/rule-fields", json=sample_rule_field_data
         )
         field_key = create_response.json()["field_key"]
 
         # Create metadata
         metadata_payload = {"meta_value": {"key": "value"}}
-        async_admin_client.put(
+        await async_admin_client.put(
             f"/api/v1/rule-fields/{field_key}/metadata/test",
             json=metadata_payload,
         )
 
         # Delete metadata
-        async_admin_client.delete(f"/api/v1/rule-fields/{field_key}/metadata/test")
+        await async_admin_client.delete(f"/api/v1/rule-fields/{field_key}/metadata/test")
 
-        logs = async_admin_client.get(
-            "/api/v1/audit-log?action=DELETE&entity_type=RULE_FIELD_METADATA"
+        logs = (
+            await async_admin_client.get(
+                "/api/v1/audit-log?action=DELETE&entity_type=RULE_FIELD_METADATA"
+            )
         ).json()
         items = logs["items"]
 
@@ -646,7 +652,7 @@ class TestEdgeCases:
 
         long_id = str(uuid.uuid7())
 
-        response = async_maker_client.get(f"/api/v1/audit-log?entity_id={long_id}")
+        response = await async_maker_client.get(f"/api/v1/audit-log?entity_id={long_id}")
 
         assert response.status_code == 200
 
@@ -655,7 +661,7 @@ class TestEdgeCases:
         self, async_maker_client: TestClient
     ):
         """Test that invalid date format is handled."""
-        response = async_maker_client.get("/api/v1/audit-log?since=invalid-date")
+        response = await async_maker_client.get("/api/v1/audit-log?since=invalid-date")
 
         # Should return 400 or 422 for validation error
         assert response.status_code in [200, 400, 422]
@@ -663,7 +669,7 @@ class TestEdgeCases:
     @pytest.mark.anyio
     async def test_should_handle_BLOCKLIST_limit(self, async_maker_client: TestClient):
         """Test that BLOCKLIST limit is handled."""
-        response = async_maker_client.get("/api/v1/audit-log?limit=-1")
+        response = await async_maker_client.get("/api/v1/audit-log?limit=-1")
 
         # Should either use default or return error
         assert response.status_code in [200, 400, 422]

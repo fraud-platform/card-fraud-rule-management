@@ -37,8 +37,8 @@ def get_engine() -> Engine:
     """
     Create and configure the SQLAlchemy engine.
 
-    Converts the PostgreSQL URL to use psycopg3 driver and enables
-    connection health checks via pool_pre_ping.
+    Uses psycopg driver for sync operations (migrations, scripts).
+    Connection health checks via pool_pre_ping.
 
     Production-ready configuration includes:
     - Connection pooling with appropriate limits
@@ -53,14 +53,13 @@ def get_engine() -> Engine:
     if _engine is not None:
         return _engine
 
-    url = settings.database_url_app
+    url = settings.sync_url
     if not url:
         raise RuntimeError("DATABASE_URL_APP is required")
 
     # Production uses Postgres (Neon). Keep connection args minimal.
     connect_args: dict[str, object] = {}
-    if url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if url.startswith("postgresql"):
         # Set connection timeout
         # Note: statement_timeout is NOT set here because Neon's connection pooler
         # doesn't support it in the options string. Set it per-query if needed.
@@ -178,13 +177,37 @@ def get_db_session() -> Generator[Session]:
 # ============================================================================
 
 
+def create_fresh_async_engine() -> AsyncEngine:
+    """Create a fresh async engine without caching.
+
+    Used for tests to ensure each test gets its own engine bound to its event loop.
+    """
+    url = settings.async_url
+    if not url:
+        raise RuntimeError("DATABASE_URL_APP is required")
+
+    return create_async_engine(
+        url,
+        pool_size=5,
+        max_overflow=5,
+        pool_timeout=30,
+        pool_recycle=3600,
+        pool_pre_ping=True,
+        echo=False,
+        connect_args={
+            "server_settings": {"timezone": "UTC", "search_path": "fraud_gov,public"},
+            "timeout": 30,
+        },
+    )
+
+
 def get_async_engine() -> AsyncEngine:
     """
     Create and configure the async SQLAlchemy engine.
 
-    psycopg3 (psycopg[binary]>=3.2) supports async natively.
+    Uses asyncpg driver for async operations (FastAPI endpoints).
     SQLAlchemy 2.0+ automatically uses the async adaptation when
-    create_async_engine is called with a psycopg URL.
+    create_async_engine is called with an asyncpg URL.
 
     Returns:
         Configured async SQLAlchemy engine
@@ -194,13 +217,9 @@ def get_async_engine() -> AsyncEngine:
     if _async_engine is not None:
         return _async_engine
 
-    url = settings.database_url_app
+    url = settings.async_url
     if not url:
         raise RuntimeError("DATABASE_URL_APP is required")
-
-    # Ensure psycopg driver is specified (psycopg3 has native async support)
-    if url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
     _async_engine = create_async_engine(
         url,
@@ -210,6 +229,10 @@ def get_async_engine() -> AsyncEngine:
         pool_recycle=3600,
         pool_pre_ping=True,
         echo=False,
+        connect_args={
+            "server_settings": {"timezone": "UTC", "search_path": "fraud_gov,public"},
+            "timeout": 30,
+        },
     )
 
     # Note: OpenTelemetry instrumentation for async engines
@@ -238,6 +261,19 @@ def get_async_sessionmaker() -> async_sessionmaker[AsyncSession]:
         expire_on_commit=False,
     )
     return _async_sessionmaker
+
+
+async def reset_async_engine() -> None:
+    """Reset the async database engine and sessionmaker.
+
+    Useful for tests to ensure fresh connections on new event loops.
+    """
+    global _async_engine, _async_sessionmaker
+
+    if _async_engine is not None:
+        await _async_engine.dispose()
+    _async_engine = None
+    _async_sessionmaker = None
 
 
 @asynccontextmanager

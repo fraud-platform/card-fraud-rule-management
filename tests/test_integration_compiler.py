@@ -23,6 +23,8 @@ from app.core.errors import CompilationError, NotFoundError
 from app.db.models import RuleSet, RuleSetVersion, RuleSetVersionRule, RuleVersion
 from app.domain.enums import EntityStatus, RuleType
 
+pytestmark = pytest.mark.smoke
+
 # =============================================================================
 # Helper functions for async database operations
 # =============================================================================

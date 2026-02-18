@@ -24,6 +24,8 @@ from app.repos.rule_repo import create_rule, create_rule_version
 from app.repos.ruleset_repo import create_ruleset
 from tests.conftest import acreate_rule_in_db
 
+pytestmark = pytest.mark.smoke
+
 
 class TestConcurrentRuleUpdates:
     """Tests for concurrent rule updates using threading."""

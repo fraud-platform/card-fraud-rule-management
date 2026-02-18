@@ -1,9 +1,8 @@
-import hmac
 import logging
 import re
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -11,6 +10,7 @@ from app.api.routes import test_utils
 from app.api.routes.approvals import router as approvals_router
 from app.api.routes.field_registry import router as field_registry_router
 from app.api.routes.health import router as health_router
+from app.api.routes.monitoring import router as monitoring_router
 from app.api.routes.rule_fields import router as rule_fields_router
 from app.api.routes.rules import router as rules_router
 from app.api.routes.rulesets import router as rulesets_router
@@ -24,7 +24,6 @@ from app.core.observability import (
     ObservabilityMiddleware,
     configure_structured_logging,
     extract_request_context,
-    metrics_endpoint,
 )
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.request_logging import RequestLoggingMiddleware
@@ -371,6 +370,10 @@ def create_app() -> FastAPI:
     # Router Registration
     # ============================================================================
 
+    # Monitoring routes (no prefix - metrics at /metrics)
+    if settings.observability_enabled:
+        app.include_router(monitoring_router)
+
     app.include_router(health_router, prefix=API_PREFIX)
     app.include_router(rule_fields_router, prefix=API_PREFIX)
     app.include_router(field_registry_router, prefix=API_PREFIX)
@@ -381,52 +384,6 @@ def create_app() -> FastAPI:
     # Test utilities (ONLY in local and test, NEVER in production)
     if settings.app_env in ("local", "test"):
         app.include_router(test_utils.router, prefix=API_PREFIX, tags=["test-utils"])
-
-    # ============================================================================
-    # Metrics Endpoint (Prometheus) - Token Protected
-    # ============================================================================
-
-    async def protected_metrics(request: Request) -> Response:
-        """
-        Protected Prometheus metrics endpoint.
-
-        SECURITY: Always requires authentication via X-Metrics-Token header.
-        Exposes internal system metrics that could aid reconnaissance if leaked.
-        """
-        from app.core.config import settings
-
-        # Verify token is configured
-        expected_token = settings.metrics_token
-        if not expected_token:
-            logger.error(
-                "Metrics endpoint accessed but METRICS_TOKEN not configured",
-                extra={"security_event": True, "event_type": "METRICS_NOT_CONFIGURED"},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Metrics token not configured. Set METRICS_TOKEN environment variable.",
-            )
-
-        # Verify token using constant-time comparison to prevent timing attacks
-        metrics_token = request.headers.get("X-Metrics-Token")
-        if not hmac.compare_digest(metrics_token or "", expected_token):
-            logger.warning(
-                "Unauthorized metrics access attempt",
-                extra={
-                    "security_event": True,
-                    "event_type": "METRICS_ACCESS_DENIED",
-                    "client_ip": request.client.host if request.client else "unknown",
-                },
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid metrics token",
-            )
-
-        return metrics_endpoint()
-
-    if settings.observability_enabled:
-        app.add_route("/metrics", protected_metrics)
 
     return app
 

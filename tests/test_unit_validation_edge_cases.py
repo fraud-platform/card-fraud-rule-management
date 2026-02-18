@@ -34,7 +34,7 @@ class TestRuleFieldValidationEdgeCases:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Should either be accepted (will be stored as string) or rejected
         # If accepted, it's stored as-is since SQL injection is prevented by parameterized queries
@@ -53,7 +53,7 @@ class TestRuleFieldValidationEdgeCases:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Should either accept (stored safely) or reject
         assert response.status_code in [201, 400, 422]
@@ -71,7 +71,7 @@ class TestRuleFieldValidationEdgeCases:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # XSS payload in text field should be accepted
         # (output encoding is frontend responsibility)
@@ -79,7 +79,7 @@ class TestRuleFieldValidationEdgeCases:
 
         # Verify it's stored as-is
         field_key = response.json()["field_key"]
-        get_response = admin_client.get(f"/api/v1/rule-fields/{field_key}")
+        get_response = await admin_client.get(f"/api/v1/rule-fields/{field_key}")
         assert "<script>alert('xss')</script>" in get_response.json()["display_name"]
 
     @pytest.mark.anyio
@@ -95,7 +95,7 @@ class TestRuleFieldValidationEdgeCases:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Should accept (frontend handles encoding)
         assert response.status_code == 201
@@ -113,7 +113,7 @@ class TestRuleFieldValidationEdgeCases:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Unicode should be handled properly in display_name
         assert response.status_code == 201
@@ -131,7 +131,7 @@ class TestRuleFieldValidationEdgeCases:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Emoji should be accepted
         assert response.status_code == 201
@@ -149,7 +149,7 @@ class TestRuleFieldValidationEdgeCases:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Should reject due to database constraints
         assert response.status_code in [400, 422]
@@ -167,7 +167,7 @@ class TestRuleFieldValidationEdgeCases:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Should reject null bytes
         assert response.status_code in [400, 422]
@@ -185,7 +185,7 @@ class TestRuleFieldValidationEdgeCases:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Control characters may be rejected or accepted
         assert response.status_code in [201, 400, 409, 422]
@@ -203,7 +203,7 @@ class TestRuleFieldValidationEdgeCases:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Zero-width characters should be handled
         assert response.status_code in [201, 400, 422]
@@ -227,7 +227,7 @@ class TestRuleValidationEdgeCases:
             "priority": 100,
         }
 
-        response = maker_client.post("/api/v1/rules", json=payload)
+        response = await maker_client.post("/api/v1/rules", json=payload)
 
         # Should accept (SQL injection prevented by parameterized queries)
         # or reject due to validation rules
@@ -249,7 +249,7 @@ class TestRuleValidationEdgeCases:
             "priority": 100,
         }
 
-        response = maker_client.post("/api/v1/rules", json=payload)
+        response = await maker_client.post("/api/v1/rules", json=payload)
 
         # Should accept (frontend handles encoding)
         assert response.status_code == 201
@@ -275,7 +275,7 @@ class TestRuleValidationEdgeCases:
             "priority": 100,
         }
 
-        response = maker_client.post("/api/v1/rules", json=payload)
+        response = await maker_client.post("/api/v1/rules", json=payload)
 
         # Should reject due to depth validation
         assert response.status_code == 422
@@ -296,7 +296,7 @@ class TestRuleValidationEdgeCases:
             "priority": 100,
         }
 
-        response = maker_client.post("/api/v1/rules", json=payload)
+        response = await maker_client.post("/api/v1/rules", json=payload)
 
         # Should reject due to array size validation
         assert response.status_code == 422
@@ -318,7 +318,7 @@ class TestRuleValidationEdgeCases:
             "priority": 100,
         }
 
-        response = maker_client.post("/api/v1/rules", json=payload)
+        response = await maker_client.post("/api/v1/rules", json=payload)
 
         # Type validation happens at compile time, not creation time
         # Rule creation should succeed (accepted as valid JSON structure)
@@ -342,7 +342,7 @@ class TestRuleValidationEdgeCases:
             "priority": -100,
         }
 
-        response = maker_client.post("/api/v1/rules", json=payload)
+        response = await maker_client.post("/api/v1/rules", json=payload)
 
         # Database has a check constraint that rejects BLOCKLIST priorities
         # Should return 409 Conflict due to constraint violation
@@ -365,7 +365,7 @@ class TestRuleValidationEdgeCases:
             "priority": 999999999,  # Exceeds database constraint (max 1000)
         }
 
-        response = maker_client.post("/api/v1/rules", json=payload)
+        response = await maker_client.post("/api/v1/rules", json=payload)
 
         # Database has a check constraint that limits priority to 1-1000
         # Should return 409 Conflict due to constraint violation
@@ -400,7 +400,7 @@ class TestMalformedJsonHandling:
             "another_extra": 12345,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Pydantic should ignore extra fields
         assert response.status_code == 201
@@ -422,7 +422,7 @@ class TestEmptyAndSpecialValues:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Should reject empty field key
         assert response.status_code == 422
@@ -440,7 +440,7 @@ class TestEmptyAndSpecialValues:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Should reject whitespace-only field key
         assert response.status_code == 422
@@ -458,7 +458,7 @@ class TestEmptyAndSpecialValues:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Should reject empty display name
         assert response.status_code == 422
@@ -476,7 +476,7 @@ class TestEmptyAndSpecialValues:
             "is_active": True,
         }
 
-        response = admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Should reject null for required field
         assert response.status_code == 422
@@ -489,7 +489,7 @@ class TestIdempotencyKeyEdgeCases:
     async def test_empty_idempotency_key(self, maker_client):
         """Test handling of empty idempotency key."""
         # First create a rule and get the rule version ID
-        create_response = maker_client.post(
+        create_response = await maker_client.post(
             "/api/v1/rules",
             json={
                 "rule_name": "Test Rule",
@@ -508,7 +508,7 @@ class TestIdempotencyKeyEdgeCases:
         # Get the rule version ID from the initial version
         # When creating a rule, version 1 is created automatically
         # We need to query for it or create a new version to get the ID
-        version_response = maker_client.post(
+        version_response = await maker_client.post(
             f"/api/v1/rules/{rule_id}/versions",
             json={
                 "condition_tree": {
@@ -523,7 +523,7 @@ class TestIdempotencyKeyEdgeCases:
         rule_version_id = version_response.json()["rule_version_id"]
 
         # Try to submit with empty idempotency key
-        response = maker_client.post(
+        response = await maker_client.post(
             f"/api/v1/rule-versions/{rule_version_id}/submit",
             json={},
             headers={"X-Idempotency-Key": ""},
@@ -536,7 +536,7 @@ class TestIdempotencyKeyEdgeCases:
     async def test_very_long_idempotency_key(self, maker_client):
         """Test handling of very long idempotency key."""
         # First create a rule
-        create_response = maker_client.post(
+        create_response = await maker_client.post(
             "/api/v1/rules",
             json={
                 "rule_name": "Test Rule",
@@ -553,7 +553,7 @@ class TestIdempotencyKeyEdgeCases:
         rule_id = create_response.json()["rule_id"]
 
         # Get a rule version ID
-        version_response = maker_client.post(
+        version_response = await maker_client.post(
             f"/api/v1/rules/{rule_id}/versions",
             json={
                 "condition_tree": {
@@ -569,7 +569,7 @@ class TestIdempotencyKeyEdgeCases:
 
         # Submit with very long idempotency key
         long_key = "x" * 10000
-        response = maker_client.post(
+        response = await maker_client.post(
             f"/api/v1/rule-versions/{rule_version_id}/submit",
             json={},
             headers={"X-Idempotency-Key": long_key},
@@ -585,7 +585,7 @@ class TestPathTraversalInIds:
     @pytest.mark.anyio
     async def test_path_traversal_in_rule_id(self, maker_client):
         """Test handling of path traversal in rule ID."""
-        response = maker_client.get("/api/v1/rules/../../etc/passwd")
+        response = await maker_client.get("/api/v1/rules/../../etc/passwd")
 
         # Should return 404 (resource not found) since path traversal doesn't work
         # The path parameter is treated as a string that doesn't match any UUID in the DB
@@ -594,7 +594,7 @@ class TestPathTraversalInIds:
     @pytest.mark.anyio
     async def test_path_traversal_in_field_id(self, admin_client):
         """Test handling of path traversal in field ID."""
-        response = admin_client.get("/api/v1/rule-fields/../../../windows/win.ini")
+        response = await admin_client.get("/api/v1/rule-fields/../../../windows/win.ini")
 
         # Should return 404 (resource not found) since path traversal doesn't work
         # Field keys use string identifiers, not UUIDs, but traversal strings won't match

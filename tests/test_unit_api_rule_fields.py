@@ -32,7 +32,7 @@ class TestListRuleFields:
         await acreate_rule_field_in_db(async_db_session, field_key="field1", display_name="Field 1")
         await acreate_rule_field_in_db(async_db_session, field_key="field2", display_name="Field 2")
 
-        response = async_authenticated_client.get("/api/v1/rule-fields")
+        response = await async_authenticated_client.get("/api/v1/rule-fields")
 
         assert response.status_code == 200
         data = response.json()
@@ -44,7 +44,7 @@ class TestListRuleFields:
     @pytest.mark.anyio
     async def test_should_require_authentication(self, client: TestClient):
         """Test that authentication is required."""
-        response = client.get("/api/v1/rule-fields")
+        response = await client.get("/api/v1/rule-fields")
         assert response.status_code == 401
 
 
@@ -64,7 +64,7 @@ class TestGetRuleField:
             data_type="NUMBER",
         )
 
-        response = async_authenticated_client.get(f"/api/v1/rule-fields/{field.field_key}")
+        response = await async_authenticated_client.get(f"/api/v1/rule-fields/{field.field_key}")
 
         assert response.status_code == 200
         data = response.json()
@@ -86,7 +86,7 @@ class TestGetRuleField:
             allowed_operators=["EQ", "GT", "LT", "GTE", "LTE", "BETWEEN"],
         )
 
-        response = async_authenticated_client.get("/api/v1/rule-fields/amount")
+        response = await async_authenticated_client.get("/api/v1/rule-fields/amount")
 
         assert response.status_code == 200
         data = response.json()
@@ -99,7 +99,7 @@ class TestGetRuleField:
         self, async_authenticated_client: TestClient
     ):
         """Test retrieving non-existent field returns 404."""
-        response = async_authenticated_client.get("/api/v1/rule-fields/nonexistent")
+        response = await async_authenticated_client.get("/api/v1/rule-fields/nonexistent")
 
         assert response.status_code == 404
         data = response.json()
@@ -109,7 +109,7 @@ class TestGetRuleField:
     @pytest.mark.anyio
     async def test_should_require_authentication(self, client: TestClient):
         """Test that authentication is required."""
-        response = client.get("/api/v1/rule-fields/amount")
+        response = await client.get("/api/v1/rule-fields/amount")
         assert response.status_code == 401
 
 
@@ -132,7 +132,7 @@ class TestCreateRuleField:
             "is_active": True,
         }
 
-        response = async_admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await async_admin_client.post("/api/v1/rule-fields", json=payload)
 
         assert response.status_code == 201
         data = response.json()
@@ -156,7 +156,7 @@ class TestCreateRuleField:
             "allowed_operators": ["EQ"],
         }
 
-        response = async_admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await async_admin_client.post("/api/v1/rule-fields", json=payload)
 
         assert response.status_code == 409
         data = response.json()
@@ -172,7 +172,7 @@ class TestCreateRuleField:
             "allowed_operators": ["EQ"],
         }
 
-        response = async_admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await async_admin_client.post("/api/v1/rule-fields", json=payload)
 
         # Should fail validation (422 or 400)
         assert response.status_code in [400, 422]
@@ -190,11 +190,11 @@ class TestCreateRuleField:
         }
 
         # Regular user should be forbidden
-        response = async_authenticated_client.post("/api/v1/rule-fields", json=payload)
+        response = await async_authenticated_client.post("/api/v1/rule-fields", json=payload)
         assert response.status_code == 403
 
         # MAKER role should be forbidden (not ADMIN)
-        response = async_maker_client.post("/api/v1/rule-fields", json=payload)
+        response = await async_maker_client.post("/api/v1/rule-fields", json=payload)
         assert response.status_code == 403
 
     @pytest.mark.anyio
@@ -207,7 +207,7 @@ class TestCreateRuleField:
             "allowed_operators": ["EQ"],
         }
 
-        response = client.post("/api/v1/rule-fields", json=payload)
+        response = await client.post("/api/v1/rule-fields", json=payload)
         assert response.status_code == 401
 
 
@@ -229,7 +229,7 @@ class TestUpdateRuleField:
         )
         payload = {"display_name": "Updated Transaction Amount"}
 
-        response = async_admin_client.patch("/api/v1/rule-fields/amount", json=payload)
+        response = await async_admin_client.patch("/api/v1/rule-fields/amount", json=payload)
 
         assert response.status_code == 200
         data = response.json()
@@ -245,7 +245,9 @@ class TestUpdateRuleField:
 
         payload = {"description": "Updated field description"}
 
-        response = async_admin_client.patch(f"/api/v1/rule-fields/{field.field_key}", json=payload)
+        response = await async_admin_client.patch(
+            f"/api/v1/rule-fields/{field.field_key}", json=payload
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -260,7 +262,9 @@ class TestUpdateRuleField:
 
         payload = {"field_key": "new_key"}  # Attempting to change immutable field
 
-        response = async_admin_client.patch(f"/api/v1/rule-fields/{field.field_key}", json=payload)
+        response = await async_admin_client.patch(
+            f"/api/v1/rule-fields/{field.field_key}", json=payload
+        )
 
         # Should either ignore the change or return error
         # Based on implementation, field_key should remain unchanged
@@ -273,7 +277,7 @@ class TestUpdateRuleField:
         """Test updating non-existent field returns 404."""
         payload = {"display_name": "New Name"}
 
-        response = async_admin_client.patch("/api/v1/rule-fields/nonexistent", json=payload)
+        response = await async_admin_client.patch("/api/v1/rule-fields/nonexistent", json=payload)
 
         assert response.status_code == 404
         data = response.json()
@@ -287,7 +291,7 @@ class TestUpdateRuleField:
         field = await acreate_rule_field_in_db(async_db_session, field_key="test_field")
         payload = {"display_name": "Updated Name"}
 
-        response = async_authenticated_client.patch(
+        response = await async_authenticated_client.patch(
             f"/api/v1/rule-fields/{field.field_key}", json=payload
         )
 
@@ -301,7 +305,7 @@ class TestUpdateRuleField:
         field = await acreate_rule_field_in_db(async_db_session, field_key="test_field")
         payload = {"display_name": "Updated"}
 
-        response = client.patch(f"/api/v1/rule-fields/{field.field_key}", json=payload)
+        response = await client.patch(f"/api/v1/rule-fields/{field.field_key}", json=payload)
         assert response.status_code == 401
 
 
@@ -331,7 +335,9 @@ class TestGetFieldMetadata:
         async_db_session.add_all([meta1, meta2])
         await async_db_session.commit()
 
-        response = async_authenticated_client.get(f"/api/v1/rule-fields/{field.field_key}/metadata")
+        response = await async_authenticated_client.get(
+            f"/api/v1/rule-fields/{field.field_key}/metadata"
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -346,7 +352,9 @@ class TestGetFieldMetadata:
         """Test retrieving metadata when none exists."""
         field = await acreate_rule_field_in_db(async_db_session, field_key="test_field")
 
-        response = async_authenticated_client.get(f"/api/v1/rule-fields/{field.field_key}/metadata")
+        response = await async_authenticated_client.get(
+            f"/api/v1/rule-fields/{field.field_key}/metadata"
+        )
 
         assert response.status_code == 200
         assert response.json() == []
@@ -356,7 +364,7 @@ class TestGetFieldMetadata:
         self, async_authenticated_client: TestClient
     ):
         """Test retrieving metadata for non-existent field."""
-        response = async_authenticated_client.get("/api/v1/rule-fields/nonexistent/metadata")
+        response = await async_authenticated_client.get("/api/v1/rule-fields/nonexistent/metadata")
 
         assert response.status_code == 404
 
@@ -380,7 +388,7 @@ class TestGetSpecificMetadata:
         async_db_session.add(meta)
         await async_db_session.commit()
 
-        response = async_authenticated_client.get(
+        response = await async_authenticated_client.get(
             f"/api/v1/rule-fields/{field.field_key}/metadata/validation"
         )
 
@@ -397,7 +405,7 @@ class TestGetSpecificMetadata:
         """Test retrieving non-existent metadata key."""
         field = await acreate_rule_field_in_db(async_db_session, field_key="test_field")
 
-        response = async_authenticated_client.get(
+        response = await async_authenticated_client.get(
             f"/api/v1/rule-fields/{field.field_key}/metadata/nonexistent"
         )
 
@@ -421,7 +429,7 @@ class TestUpsertMetadata:
             }
         }
 
-        response = async_admin_client.put(
+        response = await async_admin_client.put(
             f"/api/v1/rule-fields/{field.field_key}/metadata/velocity_config",
             json=payload,
         )
@@ -449,7 +457,7 @@ class TestUpsertMetadata:
 
         payload = {"meta_value": {"min": 10, "max": 200}}
 
-        response = async_admin_client.put(
+        response = await async_admin_client.put(
             f"/api/v1/rule-fields/{field.field_key}/metadata/validation",
             json=payload,
         )
@@ -464,7 +472,7 @@ class TestUpsertMetadata:
         """Test upserting metadata for non-existent field."""
         payload = {"meta_value": {"key": "value"}}
 
-        response = async_admin_client.put(
+        response = await async_admin_client.put(
             "/api/v1/rule-fields/nonexistent/metadata/test", json=payload
         )
 
@@ -478,7 +486,7 @@ class TestUpsertMetadata:
         field = await acreate_rule_field_in_db(async_db_session, field_key="test_field")
         payload = {"meta_value": {"key": "value"}}
 
-        response = async_authenticated_client.put(
+        response = await async_authenticated_client.put(
             f"/api/v1/rule-fields/{field.field_key}/metadata/test", json=payload
         )
 
@@ -509,19 +517,19 @@ class TestDeleteMetadata:
         await async_db_session.commit()
 
         # Verify metadata exists via API
-        verify_response = async_admin_client.get(
+        verify_response = await async_admin_client.get(
             f"/api/v1/rule-fields/{field.field_key}/metadata/to_delete"
         )
         assert verify_response.status_code == 200, "Metadata should exist before delete"
 
         # Delete via API
-        response = async_admin_client.delete(
+        response = await async_admin_client.delete(
             f"/api/v1/rule-fields/{field.field_key}/metadata/to_delete"
         )
         assert response.status_code == 204
 
         # Verify deletion via API (the API should return 404)
-        verify_response = async_admin_client.get(
+        verify_response = await async_admin_client.get(
             f"/api/v1/rule-fields/{field.field_key}/metadata/to_delete"
         )
         assert verify_response.status_code == 404, "Metadata should be deleted after API call"
@@ -533,7 +541,7 @@ class TestDeleteMetadata:
         """Test deleting non-existent metadata."""
         field = await acreate_rule_field_in_db(async_db_session, field_key="test_field")
 
-        response = async_admin_client.delete(
+        response = await async_admin_client.delete(
             f"/api/v1/rule-fields/{field.field_key}/metadata/nonexistent"
         )
 
@@ -555,7 +563,7 @@ class TestDeleteMetadata:
         async_db_session.add(meta)
         await async_db_session.commit()
 
-        response = async_authenticated_client.delete(
+        response = await async_authenticated_client.delete(
             f"/api/v1/rule-fields/{field.field_key}/metadata/test"
         )
 
@@ -578,7 +586,7 @@ class TestRuleFieldEdgeCases:
             "allowed_operators": ["GT"],
         }
 
-        response = async_admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await async_admin_client.post("/api/v1/rule-fields", json=payload)
         assert response.status_code in [201, 400, 422]
 
     @pytest.mark.anyio
@@ -589,5 +597,5 @@ class TestRuleFieldEdgeCases:
             # Missing required fields: display_name, data_type, allowed_operators
         }
 
-        response = async_admin_client.post("/api/v1/rule-fields", json=payload)
+        response = await async_admin_client.post("/api/v1/rule-fields", json=payload)
         assert response.status_code == 422  # Validation error

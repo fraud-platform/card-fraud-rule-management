@@ -93,7 +93,7 @@ This system stores **rules as structured configuration objects**, not relational
 |--------|----------------|
 | **UUIDs** | UUIDv7 (generated in app, never in DB) |
 | **Schema** | All tables in `fraud_gov` schema |
-| **Driver** | psycopg v3 (NOT psycopg2) |
+| **Driver** | asyncpg (async) + psycopg v3 (sync) |
 | **JSON Storage** | JSONB for condition trees |
 | **Connection Pooling** | SQLAlchemy with pool_size=20, max_overflow=10 |
 | **SSL Mode** | `require` (encrypts all traffic) |
@@ -519,6 +519,7 @@ After database setup:
 - **Neon Documentation**: https://neon.tech/docs
 - **PostgreSQL Documentation**: https://www.postgresql.org/docs
 - **psycopg v3 Documentation**: https://www.psycopg.org/psycopg3/
+- **asyncpg Documentation**: https://magicstack.github.io/asyncpg/
 
 ---
 

@@ -28,11 +28,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship,
 
 from app.db.validators import validate_json_payload, validate_uuid_string
 from app.domain.enums import (
-    ApprovalAction,
     ApprovalEntityType,
     ApprovalStatus,
     AuditEntityType,
-    DataType,
     EntityStatus,
     RuleType,
 )
@@ -65,9 +63,7 @@ class RuleField(Base):
     field_id: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    data_type: Mapped[str] = mapped_column(
-        Enum(DataType, create_constraint=True, name="data_type"), nullable=False
-    )
+    data_type: Mapped[str] = mapped_column(Text, nullable=False)
     allowed_operators: Mapped[list[str]] = mapped_column(
         ARRAY(String),
         nullable=False,
@@ -168,9 +164,7 @@ class RuleFieldVersion(Base):
     field_id: Mapped[int] = mapped_column(Integer, nullable=False)
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    data_type: Mapped[str] = mapped_column(
-        Enum(DataType, create_constraint=True, name="data_type"), nullable=False
-    )
+    data_type: Mapped[str] = mapped_column(Text, nullable=False)
     allowed_operators: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False)
     multi_value_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -532,9 +526,7 @@ class Approval(Base):
         nullable=False,
     )
     entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=False), nullable=False)
-    action: Mapped[str] = mapped_column(
-        Enum(ApprovalAction, create_constraint=True, name="approval_action"), nullable=False
-    )
+    action: Mapped[str] = mapped_column(Text, nullable=False)
     maker: Mapped[str] = mapped_column(Text, nullable=False)
     checker: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(

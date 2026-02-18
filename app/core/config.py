@@ -11,9 +11,41 @@ import os
 import re
 from enum import Enum
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+POSTGRESQL_PREFIX = "postgresql://"
+ASYNCPG_DRIVER = "+asyncpg"
+PSYCPG_DRIVER = "+psycopg"
+ENGINE_OPTION_QUERY_KEYS = frozenset({"pool_size", "max_overflow", "pool_timeout", "pool_recycle"})
+
+
+def _strip_engine_query_params(url: str) -> str:
+    """Strip SQLAlchemy engine-only options from DSN query string."""
+    if "?" not in url:
+        return url
+
+    parsed = urlsplit(url)
+    if not parsed.query:
+        return url
+
+    filtered_query = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key.lower() not in ENGINE_OPTION_QUERY_KEYS
+    ]
+
+    return urlunsplit(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            urlencode(filtered_query, doseq=True),
+            parsed.fragment,
+        )
+    )
 
 
 class AppEnvironment(str, Enum):
@@ -75,6 +107,25 @@ class Settings(BaseSettings):
 
     # Database - Admin user (for migrations/schema changes)
     database_url_admin: str | None = None
+
+    @property
+    def async_url(self) -> str:
+        """Build async database URL using asyncpg driver."""
+        url = self.database_url_app
+        if url.startswith(POSTGRESQL_PREFIX) and ASYNCPG_DRIVER not in url:
+            new_prefix = POSTGRESQL_PREFIX.removesuffix("://") + ASYNCPG_DRIVER + "://"
+            url = url.replace(POSTGRESQL_PREFIX, new_prefix, 1)
+        return _strip_engine_query_params(url)
+
+    @property
+    def sync_url(self) -> str:
+        """Build sync database URL using psycopg driver for migrations."""
+        url = self.database_url_app
+        if ASYNCPG_DRIVER in url:
+            url = url.replace(ASYNCPG_DRIVER, PSYCPG_DRIVER, 1)
+        elif "+psycopg" not in url:
+            url = url.replace(POSTGRESQL_PREFIX, "postgresql+psycopg://", 1)
+        return _strip_engine_query_params(url)
 
     # Auth0 Configuration
     auth0_domain: str

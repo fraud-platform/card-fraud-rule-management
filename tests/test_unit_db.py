@@ -17,6 +17,7 @@ class TestDatabaseSync:
     async def test_get_engine_creates_engine(self):
         with patch("app.core.db.settings") as mock_settings:
             mock_settings.database_url_app = "postgresql://user:pass@localhost/testdb"
+            mock_settings.sync_url = "postgresql+psycopg://user:pass@localhost/testdb"
 
             # Reset global state
             import app.core.db
@@ -34,6 +35,7 @@ class TestDatabaseSync:
     async def test_get_engine_reuses_existing(self):
         with patch("app.core.db.settings") as mock_settings:
             mock_settings.database_url_app = "postgresql://user:pass@localhost/testdb"
+            mock_settings.sync_url = "postgresql+psycopg://user:pass@localhost/testdb"
 
             # Reset global state
             import app.core.db
@@ -48,6 +50,7 @@ class TestDatabaseSync:
     async def test_get_sessionmaker_creates_sessionmaker(self):
         with patch("app.core.db.settings") as mock_settings:
             mock_settings.database_url_app = "postgresql://user:pass@localhost/testdb"
+            mock_settings.sync_url = "postgresql+psycopg://user:pass@localhost/testdb"
 
             # Reset global state
             import app.core.db
@@ -64,6 +67,7 @@ class TestDatabaseSync:
     async def test_get_sessionmaker_reuses_existing(self):
         with patch("app.core.db.settings") as mock_settings:
             mock_settings.database_url_app = "postgresql://user:pass@localhost/testdb"
+            mock_settings.sync_url = "postgresql+psycopg://user:pass@localhost/testdb"
 
             # Reset global state
             import app.core.db

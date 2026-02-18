@@ -74,7 +74,7 @@ os.environ.setdefault("AUTH0_DOMAIN", "test.local")
 os.environ.setdefault("AUTH0_AUDIENCE", "test-audience")
 os.environ.setdefault("AUTH0_ALGORITHMS", "RS256")
 
-from app.core.db import get_async_engine, get_db_session  # noqa: E402
+from app.core.db import get_db_session  # noqa: E402
 from app.core.dependencies import get_current_user  # noqa: E402 (import after env setup)
 from app.db.models import Base  # noqa: E402 (import after env setup)
 from app.main import create_app  # noqa: E402 (import after env setup)
@@ -446,35 +446,34 @@ def clean_db_session(test_engine: Engine) -> Generator[Session]:
 # ============================================================================
 
 
-@pytest.fixture(scope="session")
-def async_engine() -> Generator[AsyncEngine]:
+@pytest.fixture(autouse=True)
+async def reset_async_engine_before_test():
+    """Reset async database engine before each test for fresh connections.
+
+    This ensures that asyncpg connections are not reused across different
+    event loops, which causes 'Future attached to a different loop' errors.
     """
-    Create an async PostgreSQL engine for testing.
+    from app.core.db import reset_async_engine
 
-    Uses the same DATABASE_URL_APP but with async driver.
-    Sync test_engine fixture handles schema setup.
+    await reset_async_engine()
+    yield
 
-    NOTE: Event loop policy is set to SelectorEventLoop in pytest_configure
-    for Windows compatibility with psycopg async.
+
+@pytest.fixture(scope="function")
+async def async_engine() -> AsyncGenerator[AsyncEngine]:
     """
-    engine = get_async_engine()
+    Create a fresh async PostgreSQL engine for testing.
 
-    # Verify connection works
-    import asyncio
+    Uses create_fresh_async_engine() to avoid singleton caching,
+    ensuring the engine is bound to the current event loop.
+    """
+    from app.core.db import create_fresh_async_engine
 
-    async def _verify():
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-
-    try:
-        asyncio.run(_verify())
-    except Exception as e:
-        raise RuntimeError(f"Failed to connect to Postgres with async engine: {e}")
-
+    engine = create_fresh_async_engine()
+    async with engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
     yield engine
-
-    # Dispose async engine
-    asyncio.run(engine.dispose())
+    await engine.dispose()
 
 
 @pytest.fixture(scope="function")
@@ -738,64 +737,234 @@ def _create_test_client(
 
 
 @pytest.fixture
-def client(db_session: Session) -> TestClient:
-    """TestClient without authentication."""
-    return _create_test_client(db_session=db_session)
+async def client(async_db_session: AsyncSession):
+    """AsyncClient without authentication."""
+    import httpx
+
+    from app.core.dependencies import get_async_db_session
+
+    app = create_app()
+
+    def override_get_async_db():
+        yield async_db_session
+
+    app.dependency_overrides[get_async_db_session] = override_get_async_db
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture
-def authenticated_client(db_session: Session, mock_user: dict) -> TestClient:
-    """TestClient with basic authenticated user (no specific roles)."""
-    return _create_test_client(db_session=db_session, mock_user=mock_user)
+async def authenticated_client(async_db_session: AsyncSession, mock_user: dict):
+    """AsyncClient with basic authenticated user (no specific roles)."""
+    import httpx
+
+    from app.core.dependencies import get_async_db_session
+
+    app = create_app()
+
+    def override_get_async_db():
+        yield async_db_session
+
+    app.dependency_overrides[get_async_db_session] = override_get_async_db
+
+    async def override_get_current_user():
+        return mock_user
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture
-def admin_client(db_session: Session, mock_admin: dict) -> TestClient:
-    """TestClient with ADMIN role."""
-    return _create_test_client(db_session=db_session, mock_user=mock_admin)
+async def admin_client(async_db_session: AsyncSession, mock_admin: dict):
+    """AsyncClient with ADMIN role."""
+    import httpx
+
+    from app.core.dependencies import get_async_db_session
+
+    app = create_app()
+
+    def override_get_async_db():
+        yield async_db_session
+
+    app.dependency_overrides[get_async_db_session] = override_get_async_db
+
+    async def override_get_current_user():
+        return mock_admin
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture
-def maker_client(db_session: Session, mock_maker: dict) -> TestClient:
-    """TestClient with MAKER role."""
-    return _create_test_client(db_session=db_session, mock_user=mock_maker)
+async def maker_client(async_db_session: AsyncSession, mock_maker: dict):
+    """AsyncClient with MAKER role."""
+    import httpx
+
+    from app.core.dependencies import get_async_db_session
+
+    app = create_app()
+
+    def override_get_async_db():
+        yield async_db_session
+
+    app.dependency_overrides[get_async_db_session] = override_get_async_db
+
+    async def override_get_current_user():
+        return mock_maker
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture
-def checker_client(db_session: Session, mock_checker: dict) -> TestClient:
-    """TestClient with CHECKER role."""
-    return _create_test_client(db_session=db_session, mock_user=mock_checker)
+async def checker_client(async_db_session: AsyncSession, mock_checker: dict):
+    """AsyncClient with CHECKER role."""
+    import httpx
+
+    from app.core.dependencies import get_async_db_session
+
+    app = create_app()
+
+    def override_get_async_db():
+        yield async_db_session
+
+    app.dependency_overrides[get_async_db_session] = override_get_async_db
+
+    async def override_get_current_user():
+        return mock_checker
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 # Async client fixtures for tests that need async session injection
 @pytest.fixture
-async def async_client(async_db_session: AsyncSession) -> TestClient:
-    """TestClient without authentication, using async session."""
-    return _create_test_client(async_db_session=async_db_session)
+async def async_client(async_db_session: AsyncSession):
+    """AsyncClient without authentication, using async session."""
+    import httpx
+
+    from app.core.dependencies import get_async_db_session
+
+    app = create_app()
+
+    def override_get_async_db():
+        yield async_db_session
+
+    app.dependency_overrides[get_async_db_session] = override_get_async_db
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture
-async def async_admin_client(async_db_session: AsyncSession, mock_admin: dict) -> TestClient:
-    """TestClient with ADMIN role, using async session."""
-    return _create_test_client(async_db_session=async_db_session, mock_user=mock_admin)
+async def async_admin_client(async_db_session: AsyncSession, mock_admin: dict):
+    """AsyncClient with ADMIN role, using async session."""
+    import httpx
+
+    from app.core.dependencies import get_async_db_session
+
+    app = create_app()
+
+    def override_get_async_db():
+        yield async_db_session
+
+    app.dependency_overrides[get_async_db_session] = override_get_async_db
+
+    async def override_get_current_user():
+        return mock_admin
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture
-async def async_authenticated_client(async_db_session: AsyncSession, mock_user: dict) -> TestClient:
-    """TestClient with authenticated user (no specific role), using async session."""
-    return _create_test_client(async_db_session=async_db_session, mock_user=mock_user)
+async def async_authenticated_client(async_db_session: AsyncSession, mock_user: dict):
+    """AsyncClient with authenticated user (no specific role), using async session."""
+    import httpx
+
+    from app.core.dependencies import get_async_db_session
+
+    app = create_app()
+
+    def override_get_async_db():
+        yield async_db_session
+
+    app.dependency_overrides[get_async_db_session] = override_get_async_db
+
+    async def override_get_current_user():
+        return mock_user
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture
-async def async_maker_client(async_db_session: AsyncSession, mock_maker: dict) -> TestClient:
-    """TestClient with MAKER role, using async session."""
-    return _create_test_client(async_db_session=async_db_session, mock_user=mock_maker)
+async def async_maker_client(async_db_session: AsyncSession, mock_maker: dict):
+    """AsyncClient with MAKER role, using async session."""
+    import httpx
+
+    from app.core.dependencies import get_async_db_session
+
+    app = create_app()
+
+    def override_get_async_db():
+        yield async_db_session
+
+    app.dependency_overrides[get_async_db_session] = override_get_async_db
+
+    async def override_get_current_user():
+        return mock_maker
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture
-async def async_checker_client(async_db_session: AsyncSession, mock_checker: dict) -> TestClient:
-    """TestClient with CHECKER role, using async session."""
-    return _create_test_client(async_db_session=async_db_session, mock_user=mock_checker)
+async def async_checker_client(async_db_session: AsyncSession, mock_checker: dict):
+    """AsyncClient with CHECKER role, using async session."""
+    import httpx
+
+    from app.core.dependencies import get_async_db_session
+
+    app = create_app()
+
+    def override_get_async_db():
+        yield async_db_session
+
+    app.dependency_overrides[get_async_db_session] = override_get_async_db
+
+    async def override_get_current_user():
+        return mock_checker
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture

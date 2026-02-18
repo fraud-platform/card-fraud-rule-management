@@ -116,7 +116,7 @@ Auth0 reference docs:
 
 1. IDs are UUIDv7 and generated in application code.
 2. Postgres schema is `fraud_gov`.
-3. Driver is psycopg v3 (`psycopg[binary]`), never psycopg2.
+3. Driver is asyncpg (async) + psycopg v3 (sync), never psycopg2.
 4. Compiler output must be deterministic (same input => same bytes).
 5. Maker-checker invariant: maker cannot approve own submission.
 6. Authorization is permission-based (`require_permission(...)`).

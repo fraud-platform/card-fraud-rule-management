@@ -38,6 +38,8 @@ from app.repos.ruleset_repo import (
     submit_ruleset_version,
 )
 
+pytestmark = pytest.mark.smoke
+
 # =============================================================================
 # Test Helpers
 # =============================================================================

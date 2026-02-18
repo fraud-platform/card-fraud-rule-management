@@ -31,7 +31,7 @@ class TestCreateRuleSet:
         self, async_maker_client: TestClient, sample_ruleset_data: dict
     ):
         """Test creating a new ruleset identity."""
-        response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        response = await async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
 
         assert response.status_code == 201
         data = response.json()
@@ -53,7 +53,7 @@ class TestCreateRuleSet:
             "rule_type": "ALLOWLIST",
         }
 
-        response = async_maker_client.post("/api/v1/rulesets", json=payload)
+        response = await async_maker_client.post("/api/v1/rulesets", json=payload)
 
         assert response.status_code == 201
         data = response.json()
@@ -68,7 +68,7 @@ class TestCreateRuleSet:
             "name": "Missing type",
         }
 
-        response = async_maker_client.post("/api/v1/rulesets", json=payload)
+        response = await async_maker_client.post("/api/v1/rulesets", json=payload)
 
         assert response.status_code == 422
 
@@ -78,7 +78,9 @@ class TestCreateRuleSet:
         self, async_authenticated_client: TestClient, sample_ruleset_data: dict
     ):
         """Test that MAKER role is required."""
-        response = async_authenticated_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        response = await async_authenticated_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
 
         assert response.status_code == 403
 
@@ -88,7 +90,7 @@ class TestCreateRuleSet:
         self, client: TestClient, sample_ruleset_data: dict
     ):
         """Test that authentication is required."""
-        response = client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        response = await client.post("/api/v1/rulesets", json=sample_ruleset_data)
         assert response.status_code == 401
 
 
@@ -115,10 +117,10 @@ class TestListRuleSets:
             "name": "Rules v2",
         }
 
-        async_maker_client.post("/api/v1/rulesets", json=ruleset1)
-        async_maker_client.post("/api/v1/rulesets", json=ruleset2)
+        await async_maker_client.post("/api/v1/rulesets", json=ruleset1)
+        await async_maker_client.post("/api/v1/rulesets", json=ruleset2)
 
-        response = async_maker_client.get("/api/v1/rulesets")
+        response = await async_maker_client.get("/api/v1/rulesets")
 
         assert response.status_code == 200
         data = response.json()
@@ -133,7 +135,7 @@ class TestListRuleSets:
     @pytest.mark.anyio
     async def test_should_return_empty_list_when_no_rulesets(self, async_maker_client: TestClient):
         """Test listing when no rulesets exist."""
-        response = async_maker_client.get("/api/v1/rulesets")
+        response = await async_maker_client.get("/api/v1/rulesets")
 
         assert response.status_code == 200
         data = response.json()
@@ -153,10 +155,12 @@ class TestGetRuleSet:
     ):
         """Test retrieving an existing ruleset."""
         # Create ruleset
-        create_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        create_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = create_response.json()["ruleset_id"]
 
-        response = async_maker_client.get(f"/api/v1/rulesets/{ruleset_id}")
+        response = await async_maker_client.get(f"/api/v1/rulesets/{ruleset_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -169,7 +173,7 @@ class TestGetRuleSet:
         """Test retrieving non-existent ruleset."""
         non_existent_id = str(uuid.uuid7())
 
-        response = async_maker_client.get(f"/api/v1/rulesets/{non_existent_id}")
+        response = await async_maker_client.get(f"/api/v1/rulesets/{non_existent_id}")
 
         assert response.status_code == 404
         data = response.json()
@@ -186,11 +190,13 @@ class TestCreateRuleSetVersion:
     ):
         """Test creating a ruleset version with rule versions attached."""
         # Create ruleset
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
         # Create a rule
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_data = rule_response.json()
 
         # Create a version
@@ -198,14 +204,14 @@ class TestCreateRuleSetVersion:
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_data['rule_id']}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
         # Create ruleset version with rule version attached
         create_version_payload = {"rule_version_ids": [version_id]}
-        response = async_maker_client.post(
+        response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json=create_version_payload
         )
 
@@ -223,18 +229,20 @@ class TestCreateRuleSetVersion:
     ):
         """Test creating a version with multiple rule versions."""
         # Create ruleset
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
         # Create multiple rules
-        rule1_response = async_maker_client.post(
+        rule1_response = await async_maker_client.post(
             "/api/v1/rules",
             json={
                 **sample_rule_data,
                 "rule_name": "Rule 1",
             },
         )
-        rule2_response = async_maker_client.post(
+        rule2_response = await async_maker_client.post(
             "/api/v1/rules",
             json={
                 **sample_rule_data,
@@ -250,10 +258,10 @@ class TestCreateRuleSetVersion:
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        v1_response = async_maker_client.post(
+        v1_response = await async_maker_client.post(
             f"/api/v1/rules/{rule1_id}/versions", json=version_payload
         )
-        v2_response = async_maker_client.post(
+        v2_response = await async_maker_client.post(
             f"/api/v1/rules/{rule2_id}/versions", json=version_payload
         )
 
@@ -264,7 +272,7 @@ class TestCreateRuleSetVersion:
 
         # Create ruleset version with both rule versions
         create_version_payload = {"rule_version_ids": version_ids}
-        response = async_maker_client.post(
+        response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json=create_version_payload
         )
 
@@ -280,7 +288,7 @@ class TestCreateRuleSetVersion:
         non_existent_id = str(uuid.uuid7())
         payload = {"rule_version_ids": [str(uuid.uuid7())]}
 
-        response = async_maker_client.post(
+        response = await async_maker_client.post(
             f"/api/v1/rulesets/{non_existent_id}/versions", json=payload
         )
 
@@ -295,7 +303,7 @@ class TestCreateRuleSetVersion:
         ruleset_id = str(uuid.uuid7())
         payload = {"rule_version_ids": [str(uuid.uuid7())]}
 
-        response = async_authenticated_client.post(
+        response = await async_authenticated_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json=payload
         )
 
@@ -308,12 +316,14 @@ class TestCreateRuleSetVersion:
     ):
         """Test that at least one rule version is required."""
         # Create ruleset
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
         # Try to create version without rule versions
         create_version_payload = {"rule_version_ids": []}
-        response = async_maker_client.post(
+        response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json=create_version_payload
         )
 
@@ -330,30 +340,32 @@ class TestSubmitRuleSetVersion:
     ):
         """Test submitting a ruleset version for approval."""
         # Create ruleset and version
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
         # Create rule and version
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        rule_version_response = async_maker_client.post(
+        rule_version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         rule_version_id = rule_version_response.json()["rule_version_id"]
 
         # Create ruleset version
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
 
         # Submit for approval
-        response = async_maker_client.post(
+        response = await async_maker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={}
         )
 
@@ -369,7 +381,7 @@ class TestSubmitRuleSetVersion:
         """Test submitting non-existent ruleset version."""
         non_existent_id = str(uuid.uuid7())
 
-        response = async_maker_client.post(
+        response = await async_maker_client.post(
             f"/api/v1/ruleset-versions/{non_existent_id}/submit", json={}
         )
 
@@ -381,7 +393,7 @@ class TestSubmitRuleSetVersion:
         """Test that MAKER role is required."""
         ruleset_version_id = str(uuid.uuid7())
 
-        response = async_authenticated_client.post(
+        response = await async_authenticated_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={}
         )
 
@@ -402,33 +414,37 @@ class TestApproveRuleSetVersion:
     ):
         """Test that checker can approve ruleset version created by maker."""
         # MAKER creates ruleset and version
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
         # Create rule and version
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        rule_version_response = async_maker_client.post(
+        rule_version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         rule_version_id = rule_version_response.json()["rule_version_id"]
 
         # Create ruleset version
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
 
         # Submit for approval
-        async_maker_client.post(f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={})
+        await async_maker_client.post(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={}
+        )
 
         # CHECKER approves (different user)
-        response = async_checker_client.post(
+        response = await async_checker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/approve", json={}
         )
 
@@ -445,7 +461,7 @@ class TestApproveRuleSetVersion:
         """Test approving non-existent ruleset version."""
         non_existent_id = str(uuid.uuid7())
 
-        response = async_checker_client.post(
+        response = await async_checker_client.post(
             f"/api/v1/ruleset-versions/{non_existent_id}/approve", json={}
         )
 
@@ -458,30 +474,34 @@ class TestApproveRuleSetVersion:
     ):
         """Test that CHECKER role is required."""
         # Create and submit ruleset version
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        rule_version_response = async_maker_client.post(
+        rule_version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         rule_version_id = rule_version_response.json()["rule_version_id"]
 
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
 
-        async_maker_client.post(f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={})
+        await async_maker_client.post(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={}
+        )
 
         # MAKER (not CHECKER) tries to approve
-        response = async_maker_client.post(
+        response = await async_maker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/approve", json={}
         )
 
@@ -502,27 +522,31 @@ class TestRejectRuleSetVersion:
     ):
         """Test that checker can call reject endpoint on ruleset version created by maker."""
         # MAKER creates and submits ruleset version
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        rule_version_response = async_maker_client.post(
+        rule_version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         rule_version_id = rule_version_response.json()["rule_version_id"]
 
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
 
-        async_maker_client.post(f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={})
+        await async_maker_client.post(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={}
+        )
 
         # CHECKER tries to reject (different user)
         # Note: The reject endpoint has a bug where it tries to set status to REJECTED
@@ -530,7 +554,7 @@ class TestRejectRuleSetVersion:
         # endpoint can be called and proper authorization is checked.
         # The actual rejection logic needs to be fixed in the repo.
         try:
-            response = async_checker_client.post(
+            response = await async_checker_client.post(
                 f"/api/v1/ruleset-versions/{ruleset_version_id}/reject", json={}
             )
             # If the endpoint works, verify authorization passed
@@ -545,7 +569,7 @@ class TestRejectRuleSetVersion:
         """Test that CHECKER role is required."""
         ruleset_version_id = str(uuid.uuid7())
 
-        response = async_maker_client.post(
+        response = await async_maker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/reject", json={}
         )
 
@@ -566,34 +590,40 @@ class TestCompileRuleSetVersion:
     ):
         """Test compiling an approved ruleset version."""
         # Create ruleset and version
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
         # Create and attach rule version
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
         # Create ruleset version
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
 
         # Submit and approve ruleset version
-        async_maker_client.post(f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={})
-        async_checker_client.post(f"/api/v1/ruleset-versions/{ruleset_version_id}/approve", json={})
+        await async_maker_client.post(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={}
+        )
+        await async_checker_client.post(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}/approve", json={}
+        )
 
         # Compile ruleset version
-        response = async_checker_client.post(
+        response = await async_checker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/compile"
         )
 
@@ -624,28 +654,30 @@ class TestCompileRuleSetVersion:
     ):
         """Test that only approved ruleset versions can be compiled."""
         # Create ruleset and version (DRAFT status)
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
 
         # Try to compile without approval
-        response = async_checker_client.post(
+        response = await async_checker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/compile"
         )
 
@@ -658,7 +690,9 @@ class TestCompileRuleSetVersion:
         """Test that read permission is required to compile."""
         ruleset_version_id = str(uuid.uuid7())
 
-        response = async_maker_client.post(f"/api/v1/ruleset-versions/{ruleset_version_id}/compile")
+        response = await async_maker_client.post(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}/compile"
+        )
 
         # Returns 404 for non-existent UUID (resource lookup before permission check)
         # or 403 if permission check happens first
@@ -679,31 +713,37 @@ class TestGetRuleSetVersion:
     ):
         """Test retrieving an existing ruleset version."""
         # Create and approve ruleset version
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
 
-        async_maker_client.post(f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={})
-        async_checker_client.post(f"/api/v1/ruleset-versions/{ruleset_version_id}/approve", json={})
+        await async_maker_client.post(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={}
+        )
+        await async_checker_client.post(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}/approve", json={}
+        )
 
         # Retrieve ruleset version
-        response = async_maker_client.get(f"/api/v1/ruleset-versions/{ruleset_version_id}")
+        response = await async_maker_client.get(f"/api/v1/ruleset-versions/{ruleset_version_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -719,7 +759,7 @@ class TestGetRuleSetVersion:
         """Test retrieving non-existent ruleset version."""
         non_existent_id = str(uuid.uuid7())
 
-        response = async_maker_client.get(f"/api/v1/ruleset-versions/{non_existent_id}")
+        response = await async_maker_client.get(f"/api/v1/ruleset-versions/{non_existent_id}")
 
         assert response.status_code == 404
 
@@ -738,39 +778,41 @@ class TestListRuleSetVersions:
     ):
         """Test listing all versions of a ruleset."""
         # Create ruleset
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
         # Create rule
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        rule_version_response = async_maker_client.post(
+        rule_version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         rule_version_id = rule_version_response.json()["rule_version_id"]
 
         # Create two versions
-        v1_response = async_maker_client.post(
+        v1_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
         v1_id = v1_response.json()["ruleset_version_id"]
 
         # Submit and approve first version
-        async_maker_client.post(f"/api/v1/ruleset-versions/{v1_id}/submit", json={})
-        async_checker_client.post(f"/api/v1/ruleset-versions/{v1_id}/approve", json={})
+        await async_maker_client.post(f"/api/v1/ruleset-versions/{v1_id}/submit", json={})
+        await async_checker_client.post(f"/api/v1/ruleset-versions/{v1_id}/approve", json={})
 
         # Create second version
-        async_maker_client.post(
+        await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
 
         # List versions
-        response = async_maker_client.get(f"/api/v1/rulesets/{ruleset_id}/versions")
+        response = await async_maker_client.get(f"/api/v1/rulesets/{ruleset_id}/versions")
 
         assert response.status_code == 200
         data = response.json()
@@ -791,38 +833,42 @@ class TestListRuleSetVersions:
     ):
         """Test filtering versions by status."""
         # Create ruleset
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
         # Create rule
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        rule_version_response = async_maker_client.post(
+        rule_version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         rule_version_id = rule_version_response.json()["rule_version_id"]
 
         # Create first version and approve it
-        v1_response = async_maker_client.post(
+        v1_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
         v1_id = v1_response.json()["ruleset_version_id"]
 
-        async_maker_client.post(f"/api/v1/ruleset-versions/{v1_id}/submit", json={})
-        async_checker_client.post(f"/api/v1/ruleset-versions/{v1_id}/approve", json={})
+        await async_maker_client.post(f"/api/v1/ruleset-versions/{v1_id}/submit", json={})
+        await async_checker_client.post(f"/api/v1/ruleset-versions/{v1_id}/approve", json={})
 
         # Create second version (DRAFT)
-        async_maker_client.post(
+        await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
 
         # Filter by APPROVED status
-        response = async_maker_client.get(f"/api/v1/rulesets/{ruleset_id}/versions?status=APPROVED")
+        response = await async_maker_client.get(
+            f"/api/v1/rulesets/{ruleset_id}/versions?status=APPROVED"
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -845,25 +891,27 @@ class TestRuleSetWorkflow:
     ):
         """Test complete workflow: identity -> version -> draft -> pending -> approved."""
         # 1. Create RuleSet identity
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
         # Note: RuleSet identity doesn't have status
 
         # 2. Create RuleSetVersion with rules
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
         create_version_payload = {"rule_version_ids": [version_id]}
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json=create_version_payload
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
@@ -871,13 +919,13 @@ class TestRuleSetWorkflow:
         assert ruleset_version_response.json()["version"] == 1
 
         # 3. Submit for approval -> PENDING_APPROVAL
-        submit_response = async_maker_client.post(
+        submit_response = await async_maker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={}
         )
         assert submit_response.json()["status"] == "PENDING_APPROVAL"
 
         # 4. Approve -> APPROVED
-        approve_response = async_checker_client.post(
+        approve_response = await async_checker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/approve", json={}
         )
         assert approve_response.json()["status"] == "APPROVED"
@@ -903,28 +951,34 @@ class TestRuleSetCompilation:
     ):
         """Test that compiled AST has required structure."""
         # Setup and compile ruleset version
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        version_response = async_maker_client.post(
+        version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         version_id = version_response.json()["rule_version_id"]
 
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
 
-        async_maker_client.post(f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={})
-        async_checker_client.post(f"/api/v1/ruleset-versions/{ruleset_version_id}/approve", json={})
+        await async_maker_client.post(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json={}
+        )
+        await async_checker_client.post(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}/approve", json={}
+        )
 
         # Skip compilation test for now - needs repo fix
         # Once compile_ruleset_version passes ruleset_version_id to compiler, enable this
@@ -953,7 +1007,9 @@ class TestRuleSetCompilation:
         #     assert "action" in rule
 
         # For now, just verify we got to APPROVED state
-        version_response = async_maker_client.get(f"/api/v1/ruleset-versions/{ruleset_version_id}")
+        version_response = await async_maker_client.get(
+            f"/api/v1/ruleset-versions/{ruleset_version_id}"
+        )
         assert version_response.json()["status"] == "APPROVED"
 
 
@@ -967,11 +1023,13 @@ class TestRuleSetEdgeCases:
     ):
         """Test ruleset identity without any versions."""
         # Create ruleset identity without creating any versions
-        create_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        create_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = create_response.json()["ruleset_id"]
 
         # Should be able to retrieve it
-        get_response = async_maker_client.get(f"/api/v1/rulesets/{ruleset_id}")
+        get_response = await async_maker_client.get(f"/api/v1/rulesets/{ruleset_id}")
         assert get_response.status_code == 200
 
     @pytest.mark.anyio
@@ -986,7 +1044,7 @@ class TestRuleSetEdgeCases:
             "name": "日本のルール - Japanese Rules",
         }
 
-        response = async_maker_client.post("/api/v1/rulesets", json=payload)
+        response = await async_maker_client.post("/api/v1/rulesets", json=payload)
 
         assert response.status_code == 201
         assert response.json()["name"] == "日本のルール - Japanese Rules"
@@ -1006,22 +1064,24 @@ class TestSubmitRuleSetVersionIdempotency:
     ):
         """Test that duplicate submissions with same idempotency key return existing approval."""
         # Create ruleset and version
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        rule_version_response = async_maker_client.post(
+        rule_version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         rule_version_id = rule_version_response.json()["rule_version_id"]
 
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
@@ -1031,7 +1091,7 @@ class TestSubmitRuleSetVersionIdempotency:
         submit_payload = {
             "idempotency_key": idempotency_key,
         }
-        response1 = async_maker_client.post(
+        response1 = await async_maker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json=submit_payload
         )
 
@@ -1042,7 +1102,7 @@ class TestSubmitRuleSetVersionIdempotency:
         submit_payload2 = {
             "idempotency_key": idempotency_key,
         }
-        response2 = async_maker_client.post(
+        response2 = await async_maker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json=submit_payload2
         )
 
@@ -1068,22 +1128,24 @@ class TestSubmitRuleSetVersionIdempotency:
     ):
         """Test that different idempotency keys create separate submissions."""
         # Create ruleset and version
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        rule_version_response = async_maker_client.post(
+        rule_version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         rule_version_id = rule_version_response.json()["rule_version_id"]
 
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
@@ -1092,7 +1154,7 @@ class TestSubmitRuleSetVersionIdempotency:
         submit_payload1 = {
             "idempotency_key": "key-ruleset-version-001",
         }
-        response1 = async_maker_client.post(
+        response1 = await async_maker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json=submit_payload1
         )
         assert response1.status_code == 200
@@ -1103,7 +1165,7 @@ class TestSubmitRuleSetVersionIdempotency:
         submit_payload2 = {
             "idempotency_key": "key-ruleset-version-002",
         }
-        response2 = async_maker_client.post(
+        response2 = await async_maker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json=submit_payload2
         )
 
@@ -1117,29 +1179,31 @@ class TestSubmitRuleSetVersionIdempotency:
     ):
         """Test that submissions work without idempotency key (backwards compatibility)."""
         # Create ruleset and version
-        ruleset_response = async_maker_client.post("/api/v1/rulesets", json=sample_ruleset_data)
+        ruleset_response = await async_maker_client.post(
+            "/api/v1/rulesets", json=sample_ruleset_data
+        )
         ruleset_id = ruleset_response.json()["ruleset_id"]
 
-        rule_response = async_maker_client.post("/api/v1/rules", json=sample_rule_data)
+        rule_response = await async_maker_client.post("/api/v1/rules", json=sample_rule_data)
         rule_id = rule_response.json()["rule_id"]
 
         version_payload = {
             "condition_tree": sample_rule_data["condition_tree"],
             "priority": 100,
         }
-        rule_version_response = async_maker_client.post(
+        rule_version_response = await async_maker_client.post(
             f"/api/v1/rules/{rule_id}/versions", json=version_payload
         )
         rule_version_id = rule_version_response.json()["rule_version_id"]
 
-        ruleset_version_response = async_maker_client.post(
+        ruleset_version_response = await async_maker_client.post(
             f"/api/v1/rulesets/{ruleset_id}/versions", json={"rule_version_ids": [rule_version_id]}
         )
         ruleset_version_id = ruleset_version_response.json()["ruleset_version_id"]
 
         # Submit without idempotency key
         submit_payload = {}
-        response = async_maker_client.post(
+        response = await async_maker_client.post(
             f"/api/v1/ruleset-versions/{ruleset_version_id}/submit", json=submit_payload
         )
 

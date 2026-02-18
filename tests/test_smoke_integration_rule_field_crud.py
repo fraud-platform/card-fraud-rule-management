@@ -1,6 +1,7 @@
 import pytest
 
 
+@pytest.mark.smoke
 @pytest.mark.anyio
 async def test_create_update_field_and_audit(admin_client, async_db_session):
     """Create a rule field as ADMIN, update it, and assert audit log entries were created."""
@@ -15,24 +16,24 @@ async def test_create_update_field_and_audit(admin_client, async_db_session):
     }
 
     # Create
-    resp = admin_client.post("/api/v1/rule-fields", json=payload)
+    resp = await admin_client.post("/api/v1/rule-fields", json=payload)
     assert resp.status_code == 201
     data = resp.json()
     assert data["field_key"] == "it_test_field"
 
     # Retrieve
-    get_resp = admin_client.get(f"/api/v1/rule-fields/{data['field_key']}")
+    get_resp = await admin_client.get(f"/api/v1/rule-fields/{data['field_key']}")
     assert get_resp.status_code == 200
     assert get_resp.json()["display_name"] == "IT Test Field"
 
     # Update display_name
     patch = {"display_name": "IT Test Field - Updated"}
-    patch_resp = admin_client.patch(f"/api/v1/rule-fields/{data['field_key']}", json=patch)
+    patch_resp = await admin_client.patch(f"/api/v1/rule-fields/{data['field_key']}", json=patch)
     assert patch_resp.status_code == 200
 
     # Verify audit log for CREATE
-    logs_create_data = admin_client.get(
-        "/api/v1/audit-log?action=CREATE&entity_type=RULE_FIELD"
+    logs_create_data = (
+        await admin_client.get("/api/v1/audit-log?action=CREATE&entity_type=RULE_FIELD")
     ).json()
     logs_create = logs_create_data["items"]
     assert any(
@@ -45,8 +46,8 @@ async def test_create_update_field_and_audit(admin_client, async_db_session):
     ), "Expected CREATE audit log entry not found"
 
     # Verify audit log for UPDATE contains the old/new display_name
-    logs_update_data = admin_client.get(
-        "/api/v1/audit-log?action=UPDATE&entity_type=RULE_FIELD"
+    logs_update_data = (
+        await admin_client.get("/api/v1/audit-log?action=UPDATE&entity_type=RULE_FIELD")
     ).json()
     logs_update = logs_update_data["items"]
     assert any(
