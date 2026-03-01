@@ -10,6 +10,8 @@ Supports both sync and async SQLAlchemy sessions.
 import logging
 from collections.abc import AsyncIterator, Generator
 from contextlib import asynccontextmanager, contextmanager
+from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -177,6 +179,47 @@ def get_db_session() -> Generator[Session]:
 # ============================================================================
 
 
+def _normalize_asyncpg_runtime_url(url: str) -> tuple[str, bool | None]:
+    """Strip unsupported asyncpg query params and map sslmode to asyncpg ssl arg."""
+    split = urlsplit(url)
+    ssl_mode: str | None = None
+    filtered: list[tuple[str, str]] = []
+    for key, value in parse_qsl(split.query, keep_blank_values=True):
+        if key.lower() == "sslmode":
+            ssl_mode = value
+            continue
+        filtered.append((key, value))
+
+    normalized_url = urlunsplit(
+        (
+            split.scheme,
+            split.netloc,
+            split.path,
+            urlencode(filtered, doseq=True),
+            split.fragment,
+        )
+    )
+
+    ssl_enabled: bool | None = None
+    if isinstance(ssl_mode, str):
+        mode = ssl_mode.strip().lower()
+        if mode in {"require", "verify-ca", "verify-full"}:
+            ssl_enabled = True
+        elif mode in {"disable"}:
+            ssl_enabled = False
+        elif mode in {"allow", "prefer"}:
+            # asyncpg does not support libpq's "allow"/"prefer" semantics.
+            # Avoid silently disabling TLS; warn and leave ssl unset.
+            logger.warning(
+                "DATABASE_URL_APP uses sslmode=%r; asyncpg cannot honor libpq '%s' semantics. "
+                "TLS will not be forced. Use sslmode=require (force TLS) or sslmode=disable (force plaintext).",
+                ssl_mode,
+                mode,
+            )
+
+    return normalized_url, ssl_enabled
+
+
 def create_fresh_async_engine() -> AsyncEngine:
     """Create a fresh async engine without caching.
 
@@ -186,18 +229,23 @@ def create_fresh_async_engine() -> AsyncEngine:
     if not url:
         raise RuntimeError("DATABASE_URL_APP is required")
 
+    runtime_url, ssl_enabled = _normalize_asyncpg_runtime_url(url)
+    connect_args: dict[str, Any] = {
+        "server_settings": {"timezone": "UTC", "search_path": "fraud_gov,public"},
+        "timeout": 30,
+    }
+    if ssl_enabled is not None:
+        connect_args["ssl"] = ssl_enabled
+
     return create_async_engine(
-        url,
+        runtime_url,
         pool_size=5,
         max_overflow=5,
         pool_timeout=30,
         pool_recycle=3600,
         pool_pre_ping=True,
         echo=False,
-        connect_args={
-            "server_settings": {"timezone": "UTC", "search_path": "fraud_gov,public"},
-            "timeout": 30,
-        },
+        connect_args=connect_args,
     )
 
 
@@ -221,18 +269,23 @@ def get_async_engine() -> AsyncEngine:
     if not url:
         raise RuntimeError("DATABASE_URL_APP is required")
 
+    runtime_url, ssl_enabled = _normalize_asyncpg_runtime_url(url)
+    connect_args: dict[str, Any] = {
+        "server_settings": {"timezone": "UTC", "search_path": "fraud_gov,public"},
+        "timeout": 30,
+    }
+    if ssl_enabled is not None:
+        connect_args["ssl"] = ssl_enabled
+
     _async_engine = create_async_engine(
-        url,
+        runtime_url,
         pool_size=20,
         max_overflow=10,
         pool_timeout=30,
         pool_recycle=3600,
         pool_pre_ping=True,
         echo=False,
-        connect_args={
-            "server_settings": {"timezone": "UTC", "search_path": "fraud_gov,public"},
-            "timeout": 30,
-        },
+        connect_args=connect_args,
     )
 
     # Note: OpenTelemetry instrumentation for async engines
