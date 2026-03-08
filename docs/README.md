@@ -10,7 +10,10 @@ Observability note: HTTP metrics labels use normalized route templates (no raw p
 uv sync
 uv run doppler-local
 uv run doppler-local-test
+uv run db-reset-tables
 ```
+
+High-risk reset note: `db-reset-schema` requires `--yes --schema-reset-ack RESET_SHARED_SCHEMA`.
 
 ## Documentation Standards
 

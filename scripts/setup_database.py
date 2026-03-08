@@ -17,6 +17,9 @@ Usage:
     # Reset database (truncate data only)
     doppler run --config <env> -- uv run python scripts/setup_database.py reset --mode data
 
+    # Reset database (drop/recreate service-owned tables only)
+    doppler run --config <env> -- uv run python scripts/setup_database.py reset --mode tables
+
     # Seed data
     doppler run --config <env> -- uv run python scripts/setup_database.py seed --demo
 
@@ -95,6 +98,7 @@ class ResetMode(Enum):
 
     SCHEMA = "schema"  # Drop and recreate schema
     DATA = "data"  # Truncate tables only
+    TABLES = "tables"  # Drop and recreate service-owned tables only
 
 
 class DatabaseSetup:
@@ -112,6 +116,23 @@ class DatabaseSetup:
         self.app_password = app_password
         self.analytics_password = analytics_password
         self.repo_root = Path(__file__).parent.parent
+
+    def _rule_management_tables_in_order(self) -> list[str]:
+        """Return rule-management-owned tables in dependency-safe order."""
+        return [
+            "fraud_gov.audit_log",
+            "fraud_gov.approvals",
+            "fraud_gov.ruleset_version_rules",
+            "fraud_gov.ruleset_versions",
+            "fraud_gov.ruleset_manifest",
+            "fraud_gov.rulesets",
+            "fraud_gov.rule_versions",
+            "fraud_gov.rules",
+            "fraud_gov.rule_field_versions",
+            "fraud_gov.field_registry_manifest",
+            "fraud_gov.rule_fields",
+            "fraud_gov.rule_field_metadata",
+        ]
 
     def _load_sql_file(self, filename: str) -> str:
         """Load SQL file from db directory."""
@@ -689,7 +710,10 @@ class DatabaseSetup:
                 log_info("Reset cancelled.")
                 return 0
 
-        total_steps = 5 if mode == ResetMode.SCHEMA else 3
+        if mode in (ResetMode.SCHEMA, ResetMode.TABLES):
+            total_steps = 5
+        else:
+            total_steps = 3
         results = []
 
         log_step(1, total_steps, f"Resetting database (mode: {mode.value})")
@@ -724,23 +748,38 @@ class DatabaseSetup:
                         log_warning("production_indexes.sql not found")
 
                     step_num = 5
+                elif mode == ResetMode.TABLES:
+                    log_step(2, total_steps, "Dropping rule-management-owned tables...")
+                    for table in self._rule_management_tables_in_order():
+                        conn.execute(f"DROP TABLE IF EXISTS {table} CASCADE;")
+                    conn.commit()
+                    log_success("Dropped rule-management-owned tables")
+
+                    log_step(3, total_steps, "Recreating rule-management-owned tables...")
+                    schema_sql = self._load_sql_file("fraud_governance_schema.sql")
+                    result = self._execute_sql(conn, schema_sql, "Table recreation")
+                    results.append(result)
+                    if result.success:
+                        log_success(f"{result.message}: {result.details}")
+                    else:
+                        log_error(f"{result.message}: {result.details}")
+                        return 1
+
+                    log_step(4, total_steps, "Applying indexes...")
+                    try:
+                        indexes_sql = self._load_sql_file("production_indexes.sql")
+                        result = self._execute_sql(conn, indexes_sql, "Index creation")
+                        results.append(result)
+                        if result.success:
+                            log_success(f"{result.message}: {result.details}")
+                    except FileNotFoundError:
+                        log_warning("production_indexes.sql not found")
+
+                    step_num = 5
                 else:
                     # Data mode: truncate tables
                     log_step(2, total_steps, "Truncating tables...")
-                    truncate_order = [
-                        "fraud_gov.audit_log",
-                        "fraud_gov.approvals",
-                        "fraud_gov.ruleset_version_rules",
-                        "fraud_gov.ruleset_versions",
-                        "fraud_gov.ruleset_manifest",
-                        "fraud_gov.rulesets",
-                        "fraud_gov.rule_versions",
-                        "fraud_gov.rules",
-                        "fraud_gov.rule_field_versions",
-                        "fraud_gov.field_registry_manifest",
-                        "fraud_gov.rule_fields",
-                        "fraud_gov.rule_field_metadata",
-                    ]
+                    truncate_order = self._rule_management_tables_in_order()
                     for table in truncate_order:
                         conn.execute(f"TRUNCATE TABLE {table} CASCADE;")
                     conn.commit()
@@ -940,9 +979,9 @@ def main() -> int:
     reset_parser = subparsers.add_parser("reset", help="Reset database")
     reset_parser.add_argument(
         "--mode",
-        choices=["schema", "data"],
+        choices=["schema", "data", "tables"],
         default="schema",
-        help="Reset mode: schema (drop/recreate) or data (truncate only)",
+        help="Reset mode: schema (drop/recreate), tables (rule-management tables only), or data (truncate only)",
     )
     reset_parser.add_argument(
         "--force",

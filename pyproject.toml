@@ -43,6 +43,7 @@ dev = [
 [project.scripts]
 # Development
 dev = "cli.dev:main"
+platform-adapter = "cli.platform_adapter:main"
 
 # Auth0 bootstrap, verification, and cleanup
 auth0-bootstrap = "cli.auth0_bootstrap:main"
@@ -88,11 +89,15 @@ db-init-test = "cli.db_setup:db_init_test"
 db-init-prod = "cli.db_setup:db_init_prod"
 db-reset-data = "cli.db_setup:db_reset_data"
 db-reset-data-local = "cli.db_setup:db_reset_data"
+db-reset-tables = "cli.db_setup:db_reset_tables"
+db-reset-tables-local = "cli.db_setup:db_reset_tables"
 db-reset-schema = "cli.db_setup:db_reset_schema"
 db-reset-schema-local = "cli.db_setup:db_reset_schema"
 db-reset-data-test = "cli.db_setup:db_reset_data_test"
+db-reset-tables-test = "cli.db_setup:db_reset_tables_test"
 db-reset-schema-test = "cli.db_setup:db_reset_schema_test"
 db-reset-data-prod = "cli.db_setup:db_reset_data_prod"
+db-reset-tables-prod = "cli.db_setup:db_reset_tables_prod"
 db-reset-schema-prod = "cli.db_setup:db_reset_schema_prod"
 db-verify = "cli.db_setup:db_verify"
 db-verify-local = "cli.db_setup:db_verify"

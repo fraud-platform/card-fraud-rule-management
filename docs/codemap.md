@@ -19,6 +19,9 @@ FastAPI control-plane service for rule authoring, approvals, and artifact publis
 - `uv sync`
 - `uv run doppler-local`
 - `uv run doppler-local-test`
+- `uv run db-reset-data`
+- `uv run db-reset-tables`
+- `uv run db-reset-schema --yes --schema-reset-ack RESET_SHARED_SCHEMA`
 
 HTTP metrics labels are normalized to route templates to avoid high-cardinality labels.
 

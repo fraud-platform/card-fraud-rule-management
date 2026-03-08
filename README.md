@@ -69,4 +69,9 @@ uv run infra-local-up
 # Neon setup helpers
 uv run neon-full-setup --yes
 uv run db-sync-doppler-urls --yes
+
+# Controlled reset helpers
+uv run db-reset-data
+uv run db-reset-tables
+uv run db-reset-schema --yes --schema-reset-ack RESET_SHARED_SCHEMA
 ```

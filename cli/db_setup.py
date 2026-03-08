@@ -10,6 +10,7 @@ Usage:
     uv run db-init-test     # First-time setup (test)
     uv run db-reset-data    # Data reset
     uv run db-reset-schema  # Schema reset
+    uv run db-reset-tables  # Table-only reset (service-owned tables)
     uv run db-verify        # Verify setup
     uv run db-seed-demo     # Seed with demo data
 """
@@ -22,6 +23,7 @@ from pathlib import Path
 
 # Doppler project configuration
 DOPPLER_PROJECT = "card-fraud-rule-management"
+SCHEMA_RESET_ACK_TOKEN = "RESET_SHARED_SCHEMA"
 
 
 _SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
@@ -88,6 +90,23 @@ def _run_doppler(config: str, cmd: list[str]) -> int:
         "--",
     ] + cmd
     return subprocess.run(full_cmd, check=False).returncode  # nosec
+
+
+def _require_schema_reset_ack(passthrough: list[str], *, command_name: str) -> None:
+    """Require explicit ack token for schema reset commands."""
+    has_yes = "--yes" in passthrough or "-y" in passthrough
+    if not has_yes:
+        raise SystemExit(f"{command_name} requires --yes")
+
+    for idx, token in enumerate(passthrough):
+        if token == "--schema-reset-ack":
+            if idx + 1 < len(passthrough) and passthrough[idx + 1] == SCHEMA_RESET_ACK_TOKEN:
+                return
+            break
+
+    raise SystemExit(
+        f"{command_name} requires --schema-reset-ack {SCHEMA_RESET_ACK_TOKEN}"
+    )
 
 
 def local_full_setup() -> None:
@@ -226,13 +245,29 @@ def db_reset_schema() -> None:
     """Reset database (schema mode - drop and recreate)."""
     passthrough = _validated_passthrough_args(
         sys.argv[1:],
-        allowed_flags={"--yes": 0, "-y": 0},
+        allowed_flags={"--yes": 0, "-y": 0, "--schema-reset-ack": 1},
         command_name="db-reset-schema",
     )
+    _require_schema_reset_ack(passthrough, command_name="db-reset-schema")
     sys.exit(
         _run_doppler(
             "local",
             [sys.executable, str(_SETUP_DB_SCRIPT), "reset", "--mode", "schema", *passthrough],
+        )
+    )
+
+
+def db_reset_tables() -> None:
+    """Reset database (tables mode - drop/recreate service-owned tables only)."""
+    passthrough = _validated_passthrough_args(
+        sys.argv[1:],
+        allowed_flags={"--yes": 0, "-y": 0},
+        command_name="db-reset-tables",
+    )
+    sys.exit(
+        _run_doppler(
+            "local",
+            [sys.executable, str(_SETUP_DB_SCRIPT), "reset", "--mode", "tables", *passthrough],
         )
     )
 
@@ -256,13 +291,29 @@ def db_reset_schema_test() -> None:
     """Reset database (schema mode) using Doppler test config."""
     passthrough = _validated_passthrough_args(
         sys.argv[1:],
-        allowed_flags={"--yes": 0, "-y": 0},
+        allowed_flags={"--yes": 0, "-y": 0, "--schema-reset-ack": 1},
         command_name="db-reset-schema-test",
     )
+    _require_schema_reset_ack(passthrough, command_name="db-reset-schema-test")
     sys.exit(
         _run_doppler(
             "test",
             [sys.executable, str(_SETUP_DB_SCRIPT), "reset", "--mode", "schema", *passthrough],
+        )
+    )
+
+
+def db_reset_tables_test() -> None:
+    """Reset database (tables mode) using Doppler test config."""
+    passthrough = _validated_passthrough_args(
+        sys.argv[1:],
+        allowed_flags={"--yes": 0, "-y": 0},
+        command_name="db-reset-tables-test",
+    )
+    sys.exit(
+        _run_doppler(
+            "test",
+            [sys.executable, str(_SETUP_DB_SCRIPT), "reset", "--mode", "tables", *passthrough],
         )
     )
 
@@ -286,13 +337,29 @@ def db_reset_schema_prod() -> None:
     """Reset database (schema mode) using Doppler prod config."""
     passthrough = _validated_passthrough_args(
         sys.argv[1:],
-        allowed_flags={"--yes": 0, "-y": 0},
+        allowed_flags={"--yes": 0, "-y": 0, "--schema-reset-ack": 1},
         command_name="db-reset-schema-prod",
     )
+    _require_schema_reset_ack(passthrough, command_name="db-reset-schema-prod")
     sys.exit(
         _run_doppler(
             "prod",
             [sys.executable, str(_SETUP_DB_SCRIPT), "reset", "--mode", "schema", *passthrough],
+        )
+    )
+
+
+def db_reset_tables_prod() -> None:
+    """Reset database (tables mode) using Doppler prod config."""
+    passthrough = _validated_passthrough_args(
+        sys.argv[1:],
+        allowed_flags={"--yes": 0, "-y": 0},
+        command_name="db-reset-tables-prod",
+    )
+    sys.exit(
+        _run_doppler(
+            "prod",
+            [sys.executable, str(_SETUP_DB_SCRIPT), "reset", "--mode", "tables", *passthrough],
         )
     )
 

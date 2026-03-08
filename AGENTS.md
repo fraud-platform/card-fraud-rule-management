@@ -86,7 +86,8 @@ uv run db-verify
 uv run db-verify-test
 uv run db-verify-prod
 uv run db-reset-data
-uv run db-reset-schema
+uv run db-reset-tables
+uv run db-reset-schema --yes --schema-reset-ack RESET_SHARED_SCHEMA
 uv run db-seed-demo
 
 # Neon automation
