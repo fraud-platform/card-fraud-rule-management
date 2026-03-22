@@ -72,6 +72,7 @@ if "DATABASE_URL_APP" not in os.environ:
     )
 os.environ.setdefault("AUTH0_DOMAIN", "test.local")
 os.environ.setdefault("AUTH0_AUDIENCE", "test-audience")
+os.environ.setdefault("AUTH0_USER_AUDIENCE", "test-audience")
 os.environ.setdefault("AUTH0_ALGORITHMS", "RS256")
 
 from app.core.db import get_db_session  # noqa: E402
@@ -643,14 +644,21 @@ def create_mock_token(sub: str = "test-user", roles: list[str] | None = None) ->
     for role in roles:
         permissions.update(role_permissions.get(role, set()))
 
-    return {
+    user_audience = os.environ.get("AUTH0_USER_AUDIENCE", os.environ["AUTH0_AUDIENCE"])
+    service_audience = os.environ["AUTH0_AUDIENCE"]
+    claims: dict[str, Any] = {
         "sub": sub,
-        f"{os.environ['AUTH0_AUDIENCE']}/roles": roles,
         "permissions": list(permissions),  # New permission-based auth
-        "aud": os.environ["AUTH0_AUDIENCE"],
+        "aud": user_audience,
         "iss": f"https://{os.environ['AUTH0_DOMAIN']}/",
         "exp": 9999999999,  # Far future expiration
     }
+
+    claims[f"{user_audience}/roles"] = roles
+    if service_audience != user_audience:
+        claims[f"{service_audience}/roles"] = roles
+
+    return claims
 
 
 @pytest.fixture

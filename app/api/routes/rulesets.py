@@ -8,7 +8,7 @@ Updated for v1 schema:
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
@@ -27,6 +27,7 @@ from app.api.schemas.ruleset import (
     RuleSetVersionResponse,
     RuleSetVersionSubmitRequest,
 )
+from app.core.auth import AuthenticatedUser
 from app.core.dependencies import AsyncDbSession, CurrentUser
 from app.core.security import get_user_id, require_permission
 from app.repos import ruleset_repo as repo
@@ -43,7 +44,7 @@ router = APIRouter(tags=["rulesets"])
 async def create_ruleset(
     payload: RuleSetCreate,
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("ruleset:create"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("ruleset:create"))],
 ) -> RuleSetResponse:
     """Create a new ruleset identity.
 
@@ -154,7 +155,7 @@ async def create_ruleset_version(
     ruleset_id: str,
     payload: RuleSetVersionCreate,
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("ruleset:update"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("ruleset:update"))],
 ) -> RuleSetVersionResponse:
     """Create a new version of a ruleset.
 
@@ -194,7 +195,7 @@ async def submit_ruleset_version(
     ruleset_version_id: str,
     payload: RuleSetVersionSubmitRequest,
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("ruleset:submit"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("ruleset:submit"))],
 ) -> RuleSetVersionResponse:
     """Submit a ruleset version for approval."""
     maker = get_user_id(user)
@@ -213,7 +214,7 @@ async def approve_ruleset_version(
     ruleset_version_id: str,
     payload: RuleSetVersionApproveRequest,
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("ruleset:approve"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("ruleset:approve"))],
 ) -> RuleSetVersionResponse:
     """Approve a ruleset version (triggers publishing to S3)."""
     checker = get_user_id(user)
@@ -231,7 +232,7 @@ async def reject_ruleset_version(
     ruleset_version_id: str,
     payload: RuleSetVersionRejectRequest,
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("ruleset:reject"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("ruleset:reject"))],
 ) -> RuleSetVersionResponse:
     """Reject a ruleset version."""
     checker = get_user_id(user)
@@ -250,7 +251,7 @@ async def activate_ruleset_version(
     ruleset_version_id: str,
     payload: RuleSetVersionActivateRequest,
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("ruleset:activate"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("ruleset:activate"))],
 ) -> RuleSetVersionResponse:
     """Activate a ruleset version (makes it live for runtime)."""
     activated_by = get_user_id(user)
@@ -267,7 +268,7 @@ async def activate_ruleset_version(
 async def compile_ruleset_version(
     ruleset_version_id: str,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:read")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:read"))],
 ) -> CompiledAstResponse:
     """Compile a ruleset version to AST (in-memory only, not stored)."""
     invoked_by = get_user_id(user)

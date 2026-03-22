@@ -19,7 +19,7 @@ def test_user_extraction() -> None:
     payload = {
         "iss": settings.auth0_domain,
         "sub": "auth0|manual-check-user",
-        "aud": settings.auth0_audience,
+        "aud": settings.auth0_user_audience_resolved,
         "permissions": ["rule:read", "rule:create", "ruleset:approve"],
     }
     assert get_user_sub(payload) == "auth0|manual-check-user"
@@ -29,7 +29,7 @@ def test_user_extraction() -> None:
 
 
 def test_missing_sub() -> None:
-    payload = {"aud": settings.auth0_audience}
+    payload = {"aud": settings.auth0_user_audience_resolved}
     try:
         get_user_sub(payload)
     except UnauthorizedError:

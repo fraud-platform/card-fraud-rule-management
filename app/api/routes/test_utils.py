@@ -302,7 +302,7 @@ async def generate_test_user_token(
         "client_secret": test_client_secret,
         "username": config["email"],
         "password": user_password,
-        "audience": settings.auth0_audience,
+        "audience": settings.auth0_user_audience_resolved,
         "grant_type": "http://auth0.com/oauth/grant-type/password-realm",
         "realm": "Username-Password-Authentication",
         "scope": "openid profile email",

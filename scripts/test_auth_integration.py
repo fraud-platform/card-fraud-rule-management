@@ -26,9 +26,9 @@ def test_user_extraction():
     test_payload = {
         "iss": f"https://{settings.auth0_domain}/",
         "sub": "google-oauth2|123456789",
-        "aud": settings.auth0_audience,
+        "aud": settings.auth0_user_audience_resolved,
         "exp": 1234567890,
-        f"{settings.auth0_audience}/roles": ["MAKER", "CHECKER"],
+        f"{settings.auth0_user_audience_resolved}/roles": ["RULE_MAKER", "RULE_CHECKER"],
     }
 
     # Extract user subject
@@ -39,7 +39,7 @@ def test_user_extraction():
     # Extract user roles
     roles = get_user_roles(test_payload)
     print(f"User Roles: {roles}")
-    assert roles == ["MAKER", "CHECKER"], "User roles mismatch"
+    assert roles == ["RULE_MAKER", "RULE_CHECKER"], "User roles mismatch"
 
     print("User extraction tests passed!")
 
@@ -50,7 +50,7 @@ def test_missing_sub():
 
     payload_without_sub = {
         "iss": f"https://{settings.auth0_domain}/",
-        "aud": settings.auth0_audience,
+        "aud": settings.auth0_user_audience_resolved,
     }
 
     try:
@@ -68,7 +68,7 @@ def test_missing_roles():
     payload_without_roles = {
         "sub": "auth0|user123",
         "iss": f"https://{settings.auth0_domain}/",
-        "aud": settings.auth0_audience,
+        "aud": settings.auth0_user_audience_resolved,
     }
 
     roles = get_user_roles(payload_without_roles)
@@ -83,7 +83,7 @@ def test_malformed_roles():
 
     payload_with_string_roles = {
         "sub": "auth0|user123",
-        f"{settings.auth0_audience}/roles": "MAKER",  # String instead of list
+        f"{settings.auth0_user_audience_resolved}/roles": "RULE_MAKER",  # String instead of list
     }
 
     roles = get_user_roles(payload_with_string_roles)
@@ -96,44 +96,48 @@ def test_role_checker():
     """Test role-based access control."""
     print("\n=== Testing Role-Based Access Control ===")
 
-    # User with MAKER role
+    # User with RULE_MAKER role
     maker_payload = {
         "sub": "google-oauth2|maker123",
-        f"{settings.auth0_audience}/roles": ["MAKER"],
+        f"{settings.auth0_user_audience_resolved}/roles": ["RULE_MAKER"],
     }
 
-    # User with CHECKER role
+    # User with RULE_CHECKER role
     checker_payload = {
         "sub": "google-oauth2|checker456",
-        f"{settings.auth0_audience}/roles": ["CHECKER"],
+        f"{settings.auth0_user_audience_resolved}/roles": ["RULE_CHECKER"],
     }
 
-    # User with both roles
+    # User with admin role
     admin_payload = {
         "sub": "google-oauth2|admin789",
-        f"{settings.auth0_audience}/roles": ["MAKER", "CHECKER", "ADMIN"],
+        f"{settings.auth0_user_audience_resolved}/roles": [
+            "RULE_MAKER",
+            "RULE_CHECKER",
+            "PLATFORM_ADMIN",
+        ],
     }
 
     # Create role checker dependency
-    require_maker = require_role("MAKER")
+    require_maker = require_role("RULE_MAKER")
     role_checker = require_maker  # Get the inner function
 
-    # Test: MAKER can access MAKER endpoint
-    print("\n1. Testing MAKER accessing MAKER endpoint...")
+    # Test: RULE_MAKER can access RULE_MAKER endpoint
+    print("\n1. Testing RULE_MAKER accessing RULE_MAKER endpoint...")
     try:
         # Simulate the dependency injection
         from unittest.mock import Mock
 
         Mock(return_value=maker_payload)
         result = role_checker(user=maker_payload)
-        print("   Success: MAKER granted access")
+        print("   Success: RULE_MAKER granted access")
         assert result == maker_payload
     except ForbiddenError:
         print("   Error: Should have granted access")
         raise
 
-    # Test: CHECKER cannot access MAKER endpoint
-    print("\n2. Testing CHECKER accessing MAKER endpoint...")
+    # Test: RULE_CHECKER cannot access RULE_MAKER endpoint
+    print("\n2. Testing RULE_CHECKER accessing RULE_MAKER endpoint...")
     try:
         result = role_checker(user=checker_payload)
         print("   Error: Should have denied access")
@@ -142,11 +146,11 @@ def test_role_checker():
         print(f"   Success: Access denied - {e.message}")
         assert "Insufficient permissions" in e.message
 
-    # Test: ADMIN (has MAKER role) can access MAKER endpoint
-    print("\n3. Testing ADMIN accessing MAKER endpoint...")
+    # Test: PLATFORM_ADMIN (has RULE_MAKER role) can access RULE_MAKER endpoint
+    print("\n3. Testing PLATFORM_ADMIN accessing RULE_MAKER endpoint...")
     try:
         result = role_checker(user=admin_payload)
-        print("   Success: ADMIN (with MAKER role) granted access")
+        print("   Success: PLATFORM_ADMIN (with RULE_MAKER role) granted access")
         assert result == admin_payload
     except ForbiddenError:
         print("   Error: Should have granted access")
@@ -171,12 +175,14 @@ def test_config():
     print("\n=== Testing Configuration ===")
 
     print(f"Auth0 Domain: {settings.auth0_domain}")
-    print(f"Auth0 Audience: {settings.auth0_audience}")
+    print(f"Auth0 Service Audience: {settings.auth0_audience}")
+    print(f"Auth0 User Audience: {settings.auth0_user_audience_resolved}")
     print(f"Auth0 Algorithms: {settings.auth0_algorithms_list}")
     print(f"CORS Origins: {settings.cors_origins_list}")
 
     assert settings.auth0_domain, "Auth0 domain not configured"
     assert settings.auth0_audience, "Auth0 audience not configured"
+    assert settings.auth0_user_audience_resolved, "Auth0 user audience not configured"
     assert "RS256" in settings.auth0_algorithms_list, "RS256 algorithm not configured"
 
     print("Configuration test passed!")

@@ -1,11 +1,11 @@
 # Card Fraud Platform - Authentication & Authorization Model
 
-> **IMPORTANT:** This file must be identical in all four repositories to prevent IAM drift.
-> Any changes require review and synchronized updates across all projects.
+> **IMPORTANT:** The platform repository is the canonical source of truth for suite-wide Auth0 ownership and Doppler naming.
+> This file mirrors the portal-relevant contract and should stay synchronized with the platform auth docs.
 
-**Version:** 1.0.0
-**Last Updated:** 2026-01-18
-**Status:** APPROVED
+**Version:** 2.0.0
+**Last Updated:** 2026-03-22
+**Status:** APPROVED — Unified audience migration complete
 
 ---
 
@@ -26,39 +26,56 @@ This document defines the authoritative authentication and authorization model f
 
 ## 2. Platform Components
 
-| Project | Type | Responsibility |
-|---------|------|----------------|
-| `card-fraud-rule-management` | FastAPI | Rule authoring, governance, maker-checker workflow |
-| `card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring` | Quarkus | Runtime rule execution (machine only) |
-| `card-fraud-transaction-management` | FastAPI | Fraud operations & case handling |
-| `card-fraud-intelligence-portal` | React SPA | Unified human UI |
+| Project                                                         | Type      | Responsibility                                     |
+| --------------------------------------------------------------- | --------- | -------------------------------------------------- |
+| `card-fraud-rule-management`                                    | FastAPI   | Rule authoring, governance, maker-checker workflow |
+| `card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring` | Quarkus   | Runtime rule execution (machine only)              |
+| `card-fraud-transaction-management`                             | FastAPI   | Fraud operations & case handling                   |
+| `card-fraud-intelligence-portal`                                | React SPA | Unified human UI                                   |
 
 ---
 
 ## 3. Identity Provider
 
-| Setting | Value |
-|---------|-------|
-| **IdP** | Auth0 |
-| **Tenant** | `your-tenant.us.auth0.com` |
-| **Environments** | local, test, prod |
-| **RBAC** | Enabled |
-| **Permissions in Token** | Yes |
+| Setting                  | Value                                      |
+| ------------------------ | ------------------------------------------ |
+| **IdP**                  | Auth0                                      |
+| **Tenant**               | `$AUTH0_MGMT_DOMAIN` (from Doppler)        |
+| **Environments**         | local, test, prod                          |
+| **RBAC**                 | Enabled                                    |
+| **Permissions in Token** | Yes                                        |
 
-### API Audiences (Separate Per Service)
+### API Audiences (Resource Servers)
 
-| API | Audience |
-|-----|----------|
-| Rule Management | `https://fraud-rule-management-api` |
-| Rule Engine | `https://fraud-rule-engine-api` |
-| Transaction Management | `https://fraud-transaction-management-api` |
+| Name                             | Identifier (audience)                        | Purpose                                                        | Status     |
+| -------------------------------- | -------------------------------------------- | -------------------------------------------------------------- | ---------- |
+| Fraud Governance Unified API     | `https://fraud-governance-api`               | **Primary.** Single audience for all portal-issued human tokens. All 3 backend services validate this. | **Active** |
+| Fraud Rule Management API        | `https://fraud-rule-management-api`          | Legacy per-service audience (M2M only, human tokens use unified) | Retained   |
+| Fraud Rule Engine API            | `https://fraud-rule-engine-api`              | Runtime engine M2M audience                                     | Active     |
+| Fraud Transaction Management API | `https://fraud-transaction-management-api`   | Legacy per-service audience (M2M only)                          | Retained   |
+| Fraud Ops Analyst Agent API      | `https://fraud-ops-analyst-agent-api`        | Legacy per-service audience (M2M only)                          | Retained   |
+
+> **Unified Audience:** All portal (SPA) tokens request `https://fraud-governance-api`. Backend services accept this audience for human-user JWTs. The per-service audiences remain for M2M client-credentials tokens.
+
+### Auth0 Applications (Clients)
+
+| Client Name                      | Type    | Doppler Key / Notes                                   | Purpose                                              |
+| -------------------------------- | ------- | ----------------------------------------------------- | ---------------------------------------------------- |
+| Fraud Intelligence Portal        | SPA     | `VITE_AUTH0_CLIENT_ID` (portal project)               | Browser login (PKCE)                                 |
+| Local Test Client                | M2M     | `E2E_AUTH0_CLIENT_ID` / `AUTH0_TEST_CLIENT_ID`        | E2E password-realm tests                             |
+| Auth0 Management Automation      | M2M     | `AUTH0_MGMT_CLIENT_ID` (all backend projects)         | Management API automation                            |
+| Fraud Rule Management M2M        | M2M     | `AUTH0_CLIENT_ID` (rule-management project)           | Rule management service-to-service                   |
+| Fraud Transaction Management M2M | M2M     | `AUTH0_CLIENT_ID` (transaction-management project)    | Transaction management service-to-service            |
+| Fraud Ops Analyst Agent M2M      | M2M     | `AUTH0_CLIENT_ID` (ops-analyst-agent project)         | Ops analyst agent service-to-service                 |
+| Fraud Rule Engine M2M            | M2M     | `AUTH0_CLIENT_ID` (rule-engine project)               | Rule engine runtime execution                        |
+| Default App                      | Generic | Auth0 default (unused)                                | Auth0 default — not used                             |
 
 ### Auth Model by User Type
 
-| User Type | Auth Method |
-|-----------|-------------|
-| Human users | Roles + Permissions (via PKCE flow) |
-| Machine users | Client Credentials + Scopes |
+| User Type     | Auth Method                         |
+| ------------- | ----------------------------------- |
+| Human users   | Roles + Permissions (via PKCE flow) |
+| Machine users | Client Credentials + Scopes         |
 
 ---
 
@@ -66,27 +83,31 @@ This document defines the authoritative authentication and authorization model f
 
 ### 4.1 Platform Level
 
-| Role | Purpose | Notes |
-|------|---------|-------|
+| Role             | Purpose                         | Notes                  |
+| ---------------- | ------------------------------- | ---------------------- |
 | `PLATFORM_ADMIN` | IAM, tenant config, break-glass | Very restricted access |
 
 ### 4.2 Rule Governance (Rule Management API)
 
-| Role | Purpose |
-|------|---------|
-| `RULE_MAKER` | Create & edit rule drafts |
-| `RULE_CHECKER` | Review & approve rules |
-| `RULE_VIEWER` | Read-only access (audit/compliance) |
+| Role           | Purpose                             |
+| -------------- | ----------------------------------- |
+| `RULE_MAKER`   | Create & edit rule drafts           |
+| `RULE_CHECKER` | Review & approve rules              |
+| `RULE_VIEWER`  | Read-only access (audit/compliance) |
 
 **Important Notes:**
+
 - A user may have both `RULE_MAKER` and `RULE_CHECKER`
 - Backend **must** enforce no self-approval (SoD)
+- Rule-management backend dependencies return typed `AuthenticatedUser` objects, not raw JWT dicts.
+- `AuthenticatedUser` exposes `is_fraud_analyst` and `is_fraud_supervisor` helpers; platform admins bypass both.
+- Permission failures are sanitized by default via `sanitize_errors` to avoid leaking required scopes in 403 responses.
 
 ### 4.3 Fraud Operations (Transaction Management API)
 
-| Role | Purpose |
-|------|---------|
-| `FRAUD_ANALYST` | Analyze alerts, recommend action |
+| Role               | Purpose                             |
+| ------------------ | ----------------------------------- |
+| `FRAUD_ANALYST`    | Analyze alerts, recommend action    |
 | `FRAUD_SUPERVISOR` | Final decision & override authority |
 
 ---
@@ -95,26 +116,36 @@ This document defines the authoritative authentication and authorization model f
 
 ### 5.1 Rule Governance Permissions
 
-| Permission | Meaning |
-|------------|---------|
-| `rule:create` | Create new rules / rulesets |
-| `rule:update` | Modify drafts |
-| `rule:submit` | Submit for approval |
-| `rule:approve` | Approve rules |
-| `rule:reject` | Reject rules |
-| `rule:read` | View rules |
+| Permission     | Meaning                     |
+| -------------- | --------------------------- |
+| `rule:create`  | Create new rules / rulesets |
+| `rule:update`  | Modify drafts               |
+| `rule:submit`  | Submit for approval         |
+| `rule:approve` | Approve rules               |
+| `rule:reject`  | Reject rules                |
+| `rule:read`    | View rules                  |
 
 ### 5.2 Fraud Operations Permissions
 
-| Permission | Meaning |
-|------------|---------|
-| `txn:view` | View transactions |
-| `txn:comment` | Add analyst comments |
-| `txn:flag` | Flag suspicious activity |
-| `txn:recommend` | Recommend action |
-| `txn:approve` | Approve transaction |
-| `txn:block` | Block transaction |
-| `txn:override` | Override prior decision |
+| Permission      | Meaning                  |
+| --------------- | ------------------------ |
+| `txn:view`      | View transactions        |
+| `txn:comment`   | Add analyst comments     |
+| `txn:flag`      | Flag suspicious activity |
+| `txn:recommend` | Recommend action         |
+| `txn:approve`   | Approve transaction      |
+| `txn:block`     | Block transaction        |
+| `txn:override`  | Override prior decision  |
+
+### 5.3 Ops Analyst Agent Permissions
+
+| Permission        | Meaning                              |
+| ----------------- | ------------------------------------ |
+| `ops_agent:read`  | Read ops analyst data & insights     |
+| `ops_agent:run`   | Run investigations                   |
+| `ops_agent:ack`   | Acknowledge recommendations          |
+| `ops_agent:draft` | Create rule drafts from insights     |
+| `ops_agent:admin` | Admin ops analyst operations         |
 
 ---
 
@@ -122,20 +153,22 @@ This document defines the authoritative authentication and authorization model f
 
 ### Rule Governance
 
-| Role | Permissions |
-|------|-------------|
-| `PLATFORM_ADMIN` | All permissions |
-| `RULE_MAKER` | `rule:create`, `rule:update`, `rule:submit`, `rule:read` |
-| `RULE_CHECKER` | `rule:approve`, `rule:reject`, `rule:read` |
-| `RULE_VIEWER` | `rule:read` |
+| Role             | Permissions                                              |
+| ---------------- | -------------------------------------------------------- |
+| `PLATFORM_ADMIN` | All permissions; backend permission checks bypass       |
+| `RULE_MAKER`     | `rule:create`, `rule:update`, `rule:submit`, `rule:read` |
+| `RULE_CHECKER`   | `rule:approve`, `rule:reject`, `rule:read`               |
+| `RULE_VIEWER`    | `rule:read`                                              |
+
+`PLATFORM_ADMIN` is treated as an allow-all bypass in backend authorization helpers for defense in depth.
 
 ### Fraud Operations
 
-| Role | Permissions |
-|------|-------------|
-| `PLATFORM_ADMIN` | All permissions |
-| `FRAUD_ANALYST` | `txn:view`, `txn:comment`, `txn:flag`, `txn:recommend` |
-| `FRAUD_SUPERVISOR` | `txn:view`, `txn:approve`, `txn:block`, `txn:override` |
+| Role               | Permissions                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `PLATFORM_ADMIN`   | All permissions (rule + txn + ops_agent); backend permission checks bypass                                   |
+| `FRAUD_ANALYST`    | `txn:view`, `txn:comment`, `txn:flag`, `txn:recommend`, `ops_agent:read`, `ops_agent:run`, `ops_agent:ack`, `rule:read`, `ruleset:read`, `rule_field:read` |
+| `FRAUD_SUPERVISOR` | `txn:view`, `txn:comment`, `txn:flag`, `txn:recommend`, `txn:approve`, `txn:block`, `txn:override`, `ops_agent:read`, `ops_agent:run`, `ops_agent:ack`, `ops_agent:draft`, `rule:read`, `ruleset:read`, `rule_field:read` |
 
 ---
 
@@ -143,20 +176,21 @@ This document defines the authoritative authentication and authorization model f
 
 ### Key Rule
 
-> **Service accounts do NOT use roles. Only scopes.**
+> **Service accounts do NOT use roles. Auth0 issues `scope`, and the shared credentials-exchange Action mirrors the issued access-token scopes into the top-level `permissions` claim for backend consistency.**
 
 ### M2M Clients
 
-| Client | Purpose | Auth Model |
-|--------|---------|------------|
-| Rule Engine M2M | Runtime rule execution | Client Credentials + scopes |
-| Transaction Ingestion M2M | Kafka/API ingestion | Client Credentials + scopes |
-| Rule Management M2M | Testing & automation | Client Credentials + scopes |
-| Transaction Management M2M | Testing & automation | Client Credentials + scopes |
+| Client                     | Purpose                | Auth Model                  |
+| -------------------------- | ---------------------- | --------------------------- |
+| Rule Engine M2M            | Runtime rule execution | Client Credentials + scopes |
+| Transaction Ingestion M2M  | Kafka/API ingestion    | Client Credentials + scopes |
+| Rule Management M2M        | Testing & automation   | Client Credentials + scopes |
+| Transaction Management M2M | Testing & automation   | Client Credentials + scopes |
 
 ### M2M Scopes by API
 
 **Rule Engine API:**
+
 ```
 execute:rules
 read:results
@@ -165,6 +199,7 @@ read:metrics
 ```
 
 **Rule Management API:**
+
 ```
 rule:create
 rule:update
@@ -175,6 +210,7 @@ rule:read
 ```
 
 **Transaction Management API:**
+
 ```
 txn:view
 txn:comment
@@ -189,24 +225,15 @@ txn:override
 
 ## 8. JWT Token Contract
 
-### 8.1 Human User Token (Example for Rule Management API)
+### 8.1 Human User Token (Example for Portal Access)
 
 ```json
 {
   "sub": "auth0|user123",
-  "iss": "https://your-tenant.us.auth0.com/",
-  "aud": "https://fraud-rule-management-api",
-  "https://fraud-rule-management-api/roles": [
-    "RULE_MAKER",
-    "RULE_CHECKER"
-  ],
-  "permissions": [
-    "rule:create",
-    "rule:update",
-    "rule:submit",
-    "rule:approve",
-    "rule:read"
-  ],
+  "iss": "https://$AUTH0_MGMT_DOMAIN (from Doppler)/",
+  "aud": "https://fraud-governance-api",
+  "https://fraud-governance-api/roles": ["RULE_MAKER", "RULE_CHECKER"],
+  "permissions": ["rule:create", "rule:update", "rule:submit", "rule:approve", "rule:read"],
   "exp": 1737244800
 }
 ```
@@ -216,7 +243,7 @@ txn:override
 ```json
 {
   "sub": "DYpzDimxqmuk0TCizexIdv19qWBJlZo8@clients",
-  "iss": "https://your-tenant.us.auth0.com/",
+  "iss": "https://$AUTH0_MGMT_DOMAIN (from Doppler)/",
   "aud": "https://fraud-rule-engine-api",
   "scope": "execute:rules read:results replay:transactions read:metrics",
   "gty": "client-credentials",
@@ -226,14 +253,14 @@ txn:override
 
 ### 8.3 Token Claims Reference
 
-| Claim | Human Token | M2M Token |
-|-------|-------------|-----------|
-| `sub` | User ID (`auth0\|xxx`) | Client ID (`xxx@clients`) |
-| `aud` | API audience | API audience |
-| `roles` | `{audience}/roles` claim | Not present |
-| `permissions` | Array of permissions | Not present |
-| `scope` | Not present | Space-separated scopes |
-| `gty` | Not present | `client-credentials` |
+| Claim         | Human Token                     | M2M Token                 |
+| ------------- | ------------------------------ | ------------------------- |
+| `sub`         | User ID (`auth0\|xxx`)         | Client ID (`xxx@clients`) |
+| `aud`         | Shared portal audience         | API audience              |
+| `roles`       | `https://fraud-governance-api/roles` claim | Not present      |
+| `permissions` | Array of permissions           | Array mirrored from issued scopes |
+| `scope`       | Not present                    | Space-separated scopes    |
+| `gty`         | Not present                    | `client-credentials`      |
 
 ---
 
@@ -257,20 +284,21 @@ txn:override
 
 ### 9.2 Role Assignment Matrix
 
-| Job Function | Roles to Assign |
-|--------------|-----------------|
-| Fraud Rule Author | `RULE_MAKER` |
-| Senior Rule Author (can also approve) | `RULE_MAKER`, `RULE_CHECKER` |
-| Rule Approver (review only) | `RULE_CHECKER` |
-| Compliance Auditor | `RULE_VIEWER` |
-| Fraud Analyst | `FRAUD_ANALYST` |
-| Fraud Team Lead | `FRAUD_ANALYST`, `FRAUD_SUPERVISOR` |
-| Fraud Operations Manager | `FRAUD_SUPERVISOR` |
-| Platform Administrator | `PLATFORM_ADMIN` |
+| Job Function                          | Roles to Assign                     |
+| ------------------------------------- | ----------------------------------- |
+| Fraud Rule Author                     | `RULE_MAKER`                        |
+| Senior Rule Author (can also approve) | `RULE_MAKER`, `RULE_CHECKER`        |
+| Rule Approver (review only)           | `RULE_CHECKER`                      |
+| Compliance Auditor                    | `RULE_VIEWER`                       |
+| Fraud Analyst                         | `FRAUD_ANALYST`                     |
+| Fraud Team Lead                       | `FRAUD_ANALYST`, `FRAUD_SUPERVISOR` |
+| Fraud Operations Manager              | `FRAUD_SUPERVISOR`                  |
+| Platform Administrator                | `PLATFORM_ADMIN`                    |
 
 ### 9.3 Auth0 Dashboard Steps
 
 1. **Navigate to Users:**
+
    ```
    Auth0 Dashboard → User Management → Users
    ```
@@ -280,6 +308,7 @@ txn:override
    - Click on user to open details
 
 3. **Assign Roles:**
+
    ```
    User Details → Roles tab → Assign Roles → Select roles → Assign
    ```
@@ -293,14 +322,14 @@ txn:override
 ```bash
 # Get Management API token
 TOKEN=$(curl -s --request POST \
-  --url "https://your-tenant.us.auth0.com/oauth/token" \
+  --url "https://$AUTH0_MGMT_DOMAIN/oauth/token" \
   --header 'content-type: application/json' \
-  --data '{"client_id":"<mgmt-client-id>","client_secret":"<mgmt-secret>","audience":"https://your-tenant.us.auth0.com/api/v2/","grant_type":"client_credentials"}' \
+  --data '{"client_id":"<mgmt-client-id>","client_secret":"<mgmt-secret>","audience":"https://$AUTH0_MGMT_DOMAIN/api/v2/","grant_type":"client_credentials"}' \
   | jq -r '.access_token')
 
 # Assign role to user
 curl --request POST \
-  --url "https://your-tenant.us.auth0.com/api/v2/users/<user-id>/roles" \
+  --url "https://$AUTH0_MGMT_DOMAIN/api/v2/users/<user-id>/roles" \
   --header "Authorization: Bearer $TOKEN" \
   --header 'content-type: application/json' \
   --data '{"roles": ["<role-id>"]}'
@@ -314,14 +343,14 @@ curl --request POST \
 
 Each project has dedicated test users for Playwright/E2E testing:
 
-| Test User | Email | Roles | Used By |
-|-----------|-------|-------|---------|
-| `test-platform-admin` | `test-platform-admin@fraud-platform.test` | `PLATFORM_ADMIN` | All projects |
-| `test-rule-maker` | `test-rule-maker@fraud-platform.test` | `RULE_MAKER` | rule-management, portal |
-| `test-rule-checker` | `test-rule-checker@fraud-platform.test` | `RULE_CHECKER` | rule-management, portal |
-| `test-rule-maker-checker` | `test-rule-maker-checker@fraud-platform.test` | `RULE_MAKER`, `RULE_CHECKER` | rule-management, portal |
-| `test-fraud-analyst` | `test-fraud-analyst@fraud-platform.test` | `FRAUD_ANALYST` | transaction-management, portal |
-| `test-fraud-supervisor` | `test-fraud-supervisor@fraud-platform.test` | `FRAUD_SUPERVISOR` | transaction-management, portal |
+| Test User                 | Email                                         | Roles                        | Used By                        |
+| ------------------------- | --------------------------------------------- | ---------------------------- | ------------------------------ |
+| `test-platform-admin`     | `test-platform-admin@fraud-platform.test`     | `PLATFORM_ADMIN`             | All projects                   |
+| `test-rule-maker`         | `test-rule-maker@fraud-platform.test`         | `RULE_MAKER`                 | rule-management, portal        |
+| `test-rule-checker`       | `test-rule-checker@fraud-platform.test`       | `RULE_CHECKER`               | rule-management, portal        |
+| `test-rule-maker-checker` | `test-rule-maker-checker@fraud-platform.test` | `RULE_MAKER`, `RULE_CHECKER` | rule-management, portal        |
+| `test-fraud-analyst`      | `test-fraud-analyst@fraud-platform.test`      | `FRAUD_ANALYST`              | transaction-management, portal |
+| `test-fraud-supervisor`   | `test-fraud-supervisor@fraud-platform.test`   | `FRAUD_SUPERVISOR`           | transaction-management, portal |
 
 ### 10.2 Test User Credentials
 
@@ -367,7 +396,7 @@ TEST_USERS = [
 
 ```typescript
 // playwright/auth.setup.ts
-import { test as setup } from '@playwright/test';
+import { test as setup } from "@playwright/test";
 
 const testUsers = {
   ruleMaker: {
@@ -381,15 +410,15 @@ const testUsers = {
   // ... etc
 };
 
-setup('authenticate as rule maker', async ({ page }) => {
-  await page.goto('/login');
+setup("authenticate as rule maker", async ({ page }) => {
+  await page.goto("/login");
   await page.fill('[name="email"]', testUsers.ruleMaker.email);
   await page.fill('[name="password"]', testUsers.ruleMaker.password);
   await page.click('[type="submit"]');
-  await page.waitForURL('/dashboard');
+  await page.waitForURL("/dashboard");
 
   // Save auth state
-  await page.context().storageState({ path: '.auth/rule-maker.json' });
+  await page.context().storageState({ path: ".auth/rule-maker.json" });
 });
 ```
 
@@ -446,7 +475,7 @@ if ruleset.created_by == current_user.sub:
 - UI visibility based on `permissions` claim
 - Disable actions user is not authorized to perform
 - Disable approve button for self-created rules
-- Request per-API tokens using separate audiences
+- Request the shared portal user token and reuse it for rule, transaction, and ops-analyst API calls
 
 ---
 
@@ -459,14 +488,12 @@ User (Google OAuth)
         ↓
     Auth0 Login
         ↓
-    ID Token + Access Token (with roles + permissions)
+    ID Token + Access Token (shared portal audience, roles + permissions)
         ↓
     React SPA (Intelligence Portal)
-        ├─→ Token for fraud-rule-management-api
-        │   └─→ Rule Management API (checks permissions)
-        │
-        └─→ Token for fraud-transaction-management-api
-            └─→ Transaction Management API (checks permissions)
+        ├─→ Rule Management API
+        ├─→ Transaction Management API
+        └─→ Ops Analyst Agent API
 ```
 
 ### M2M Flow
@@ -503,30 +530,31 @@ Backend Service
    - All backend services
    - UI authorization logic
    - Bootstrap scripts
-3. This file is the **single source of truth**
-4. Changes must be synchronized across all 4 repositories
+3. The platform auth docs are the **single source of truth**
+4. This file must remain synchronized with the platform auth contract
 
 ---
 
 ## 16. Migration from Old Role Model
 
-### Roles to Delete
+**Status:** COMPLETE (2026-03-22)
 
-| Old Role | Replacement |
-|----------|-------------|
-| `ADMIN` | `PLATFORM_ADMIN` |
-| `MAKER` | `RULE_MAKER` or `FRAUD_ANALYST` (domain-specific) |
+The migration from per-service audiences to a unified audience is complete:
+- Unified API `https://fraud-governance-api` has 30 scopes (rule + txn + ops_agent)
+- API renamed to "Fraud Governance Unified API" in Auth0
+- All 6 roles have correct permission assignments on the unified API
+- All 3 backend services accept the unified audience for human tokens
+- SPA client has correct callback URLs (`/callback` path)
+- E2E test client has password-realm grants for unified audience
+- Per-service audiences retained for M2M tokens only
+
+### Legacy Roles (already removed)
+
+| Old Role  | Replacement                                            |
+| --------- | ------------------------------------------------------ |
+| `ADMIN`   | `PLATFORM_ADMIN`                                       |
+| `MAKER`   | `RULE_MAKER` or `FRAUD_ANALYST` (domain-specific)      |
 | `CHECKER` | `RULE_CHECKER` or `FRAUD_SUPERVISOR` (domain-specific) |
-
-### Migration Steps
-
-1. Create new roles in Auth0
-2. Create permissions and assign to roles
-3. Update bootstrap scripts in all projects
-4. Re-assign users to new roles
-5. Update backend authorization logic
-6. Update UI role checks
-7. Delete old roles
 
 ---
 
@@ -542,7 +570,8 @@ Backend Service
 ### Bootstrap Commands
 
 ```powershell
-# Rule Management (creates shared roles + permissions)
+# Rule Management (creates shared roles + permissions and deploys the shared
+# credentials-exchange Action that mirrors issued M2M scopes into `permissions`)
 cd <path-to>/card-fraud-rule-management
 uv run auth0-bootstrap --yes --verbose
 
@@ -568,30 +597,40 @@ uv run auth0-verify
 ### Shared Across All Backend Projects
 
 ```yaml
-AUTH0_MGMT_DOMAIN: your-tenant.us.auth0.com
+AUTH0_MGMT_DOMAIN: $AUTH0_MGMT_DOMAIN (from Doppler)
 AUTH0_MGMT_CLIENT_ID: <management-m2m-id>
 AUTH0_MGMT_CLIENT_SECRET: <management-m2m-secret>
-AUTH0_DOMAIN: your-tenant.us.auth0.com
+AUTH0_DOMAIN: $AUTH0_MGMT_DOMAIN (from Doppler)
 ```
 
 ### Project-Specific
 
 ```yaml
 # card-fraud-rule-management
-AUTH0_AUDIENCE: https://fraud-rule-management-api
-AUTH0_CLIENT_ID: <rule-mgmt-m2m-id>
-AUTH0_CLIENT_SECRET: <rule-mgmt-m2m-secret>
+AUTH0_AUDIENCE: https://fraud-governance-api          # Unified audience (human + M2M)
+AUTH0_USER_AUDIENCE: https://fraud-governance-api     # Same — portal tokens use this
+AUTH0_CLIENT_ID: <rule-mgmt-m2m-id>                  # From Doppler
+AUTH0_CLIENT_SECRET: <rule-mgmt-m2m-secret>           # From Doppler
 
 # card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring
-AUTH0_AUDIENCE: https://fraud-rule-engine-api
+AUTH0_AUDIENCE: https://fraud-rule-engine-api          # Engine uses its own M2M audience
 AUTH0_CLIENT_ID: <rule-engine-m2m-id>
 AUTH0_CLIENT_SECRET: <rule-engine-m2m-secret>
 
 # card-fraud-transaction-management
-AUTH0_AUDIENCE: https://fraud-transaction-management-api
+AUTH0_AUDIENCE: https://fraud-governance-api           # Unified audience
+AUTH0_USER_AUDIENCE: https://fraud-governance-api
 AUTH0_CLIENT_ID: <txn-mgmt-m2m-id>
 AUTH0_CLIENT_SECRET: <txn-mgmt-m2m-secret>
+
+# card-fraud-ops-analyst-agent
+AUTH0_AUDIENCE: https://fraud-governance-api           # Unified audience
+AUTH0_USER_AUDIENCE: https://fraud-governance-api
+AUTH0_CLIENT_ID: <ops-analyst-m2m-id>
+AUTH0_CLIENT_SECRET: <ops-analyst-m2m-secret>
 ```
+
+> **Note:** All backend services that accept portal (human) tokens validate `AUTH0_AUDIENCE = https://fraud-governance-api`. The rule engine is M2M-only and retains its own audience.
 
 ---
 
@@ -608,10 +647,10 @@ When implementing this auth model, the following code changes are required:
 
 ### React UI (Intelligence Portal)
 
-- [ ] Update `useRoles` hook for new role names
+- [ ] Update `useRoles` hook for shared portal role claims
 - [ ] Update permission-based UI visibility
 - [ ] Implement self-approval button disable logic
-- [ ] Update role claim namespace
+- [ ] Keep the shared portal audience in the SPA token path
 
 ### Bootstrap Scripts
 
@@ -623,4 +662,3 @@ When implementing this auth model, the following code changes are required:
 ---
 
 **End of Document**
-

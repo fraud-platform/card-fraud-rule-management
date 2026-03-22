@@ -111,6 +111,11 @@ Auth0 reference docs:
 - `docs/07-reference/auth-model.md`
 - `docs/01-setup/auth0-setup-guide.md`
 
+Auth0 audience ownership:
+- `AUTH0_AUDIENCE` is the service audience for this backend.
+- `AUTH0_USER_AUDIENCE` is the shared human-user audience used by the portal and role namespace.
+- `uv run auth0-bootstrap --yes --verbose` also deploys the shared credentials-exchange Action that mirrors issued M2M access-token scopes into `permissions`.
+
 ---
 
 ## 5) Project Truths (Do Not Violate)
@@ -122,6 +127,8 @@ Auth0 reference docs:
 5. Maker-checker invariant: maker cannot approve own submission.
 6. Authorization is permission-based (`require_permission(...)`).
 7. HTTP metrics route labels must use route templates (never raw request paths).
+8. `PLATFORM_ADMIN` must retain a defense-in-depth allow-all bypass in backend permission checks.
+9. The auth boundary returns typed `AuthenticatedUser` objects, not raw JWT dicts.
 
 Rule type -> evaluation mode mapping:
 - `ALLOWLIST` -> `FIRST_MATCH`

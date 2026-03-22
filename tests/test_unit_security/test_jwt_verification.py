@@ -8,6 +8,7 @@ import pytest
 from jose import JWTError
 
 from app.core.security.jwt_verification import (
+    _decode_with_supported_audiences,
     get_rsa_key,
     get_rsa_key_async,
     verify_token,
@@ -181,6 +182,20 @@ class TestTokenVerification:
 
                         assert result == {"sub": "user123", "aud": "test"}
                         mock_logger.debug.assert_called()
+
+    @pytest.mark.anyio
+    async def test_decode_with_supported_audiences_requires_configured_audience(self):
+        from app.core.errors import UnauthorizedError
+
+        with patch(
+            "app.core.security.jwt_verification._resolve_audience_candidates",
+            return_value=[],
+        ):
+            with patch("app.core.security.jwt_verification.jwt.decode") as mock_decode:
+                with pytest.raises(UnauthorizedError):
+                    _decode_with_supported_audiences("fake.token", {"kty": "RSA"})
+
+                mock_decode.assert_not_called()
 
 
 class TestAsyncTokenVerification:

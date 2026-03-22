@@ -3,6 +3,11 @@
 ## Repository Purpose
 
 FastAPI control-plane service for rule authoring, approvals, and artifact publishing.
+Auth0 setup is centralized in this repo, with `AUTH0_USER_AUDIENCE` shared across the portal and backend services.
+This repo's Auth0 bootstrap also deploys the shared credentials-exchange Action that mirrors issued M2M access-token scopes into permissions.
+Backend permission helpers treat `PLATFORM_ADMIN` as an allow-all bypass for defense in depth.
+The auth boundary now returns typed `AuthenticatedUser` objects instead of raw JWT dicts.
+`AuthenticatedUser` also exposes fraud analyst/supervisor helpers, and permission failures are sanitized by default.
 
 ## Documentation Layout
 

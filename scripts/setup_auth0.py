@@ -15,7 +15,8 @@ Required environment variables:
 - AUTH0_MGMT_DOMAIN              e.g. dev-xxxx.us.auth0.com
 - AUTH0_MGMT_CLIENT_ID           Management M2M client ID
 - AUTH0_MGMT_CLIENT_SECRET       Management M2M client secret
-- AUTH0_AUDIENCE                 e.g. https://fraud-rule-management-api
+- AUTH0_AUDIENCE                 e.g. https://fraud-governance-api
+- AUTH0_USER_AUDIENCE            e.g. https://fraud-governance-api
 
 Optional environment variables:
 - AUTH0_API_NAME                 default: Fraud Rule Management API
@@ -153,8 +154,17 @@ TRANSACTION_MANAGEMENT_PERMISSIONS: list[dict[str, str]] = [
     {"value": "txn:override", "description": "Override prior decision"},
 ]
 
-# Use Rule Management permissions as default for this API
-DEFAULT_SCOPES = RULE_MANAGEMENT_PERMISSIONS
+# Ops Analyst Agent API permissions (created here for the unified API)
+OPS_ANALYST_PERMISSIONS: list[dict[str, str]] = [
+    {"value": "ops_agent:read", "description": "Read ops analyst data and insights"},
+    {"value": "ops_agent:run", "description": "Run investigations"},
+    {"value": "ops_agent:ack", "description": "Acknowledge recommendations"},
+    {"value": "ops_agent:draft", "description": "Create rule drafts from insights"},
+    {"value": "ops_agent:admin", "description": "Admin ops analyst operations"},
+]
+
+# Use all permissions for the unified API
+DEFAULT_SCOPES = RULE_MANAGEMENT_PERMISSIONS + TRANSACTION_MANAGEMENT_PERMISSIONS + OPS_ANALYST_PERMISSIONS
 
 # =============================================================================
 # ROLES - As defined in AUTH_MODEL.md
@@ -207,6 +217,12 @@ ROLE_PERMISSIONS = {
         "txn:approve",
         "txn:block",
         "txn:override",
+        # Ops Analyst Agent permissions
+        "ops_agent:read",
+        "ops_agent:run",
+        "ops_agent:ack",
+        "ops_agent:draft",
+        "ops_agent:admin",
     ],
     # RULE_MAKER: Create and edit rules, rulesets, and rule_fields
     "RULE_MAKER": [
@@ -238,9 +254,18 @@ ROLE_PERMISSIONS = {
         "ruleset:read",
         "rule_field:read",
     ],
-    # Transaction permissions for fraud team
-    "FRAUD_ANALYST": ["txn:view", "txn:comment", "txn:flag", "txn:recommend"],
-    "FRAUD_SUPERVISOR": ["txn:view", "txn:approve", "txn:block", "txn:override"],
+    # Fraud operations: transaction + ops_agent + read-only rule access
+    "FRAUD_ANALYST": [
+        "txn:view", "txn:comment", "txn:flag", "txn:recommend",
+        "ops_agent:read", "ops_agent:run", "ops_agent:ack",
+        "rule:read", "ruleset:read", "rule_field:read",
+    ],
+    "FRAUD_SUPERVISOR": [
+        "txn:view", "txn:comment", "txn:flag", "txn:recommend",
+        "txn:approve", "txn:block", "txn:override",
+        "ops_agent:read", "ops_agent:run", "ops_agent:ack", "ops_agent:draft",
+        "rule:read", "ruleset:read", "rule_field:read",
+    ],
 }
 
 # =============================================================================
@@ -306,6 +331,7 @@ class Settings:
     mgmt_client_id: str
     mgmt_client_secret: str
     audience: str
+    user_audience: str
 
     api_name: str
     spa_name: str
@@ -592,6 +618,17 @@ class Auth0Mgmt:
             },
         )
 
+    def update_user_password(self, *, user_id: str, password: str, connection: str = "Username-Password-Authentication") -> dict:
+        """Update an existing user's password via the Management API."""
+        return self._request(
+            "PATCH",
+            f"users/{user_id}",
+            json={
+                "password": password,
+                "connection": connection,
+            },
+        )
+
     def assign_roles_to_user(self, *, user_id: str, role_ids: list[str]) -> None:
         """Assign roles to a user."""
         self._request(
@@ -654,6 +691,7 @@ def _action_code_post_login(audience: str) -> str:
         f"  const namespace = {audience!r};\n"
         "  const roles = (event.authorization && event.authorization.roles) ? event.authorization.roles : [];\n"
         "  api.accessToken.setCustomClaim(`${namespace}/roles`, roles);\n"
+        "  api.idToken.setCustomClaim(`${namespace}/roles`, roles);\n"
         "};\n"
     )
 
@@ -664,6 +702,10 @@ def _action_code_credentials_exchange(audience: str, m2m_roles: list[str]) -> st
         "exports.onExecuteCredentialsExchange = async (event, api) => {\n"
         f"  const namespace = {audience!r};\n"
         f"  api.accessToken.setCustomClaim(`${{namespace}}/roles`, {roles_js});\n"
+        "  // Mirror the issued access token scopes into the permissions claim so\n"
+        "  // backends read one claim for both human and M2M tokens.\n"
+        "  const scopes = Array.isArray(event.accessToken.scope) ? event.accessToken.scope : [];\n"
+        "  api.accessToken.setCustomClaim('permissions', scopes);\n"
         "};\n"
     )
 
@@ -704,6 +746,23 @@ def ensure_roles(mgmt: Auth0Mgmt, *, roles: list[tuple[str, str]], verbose: bool
     return out
 
 
+def _expand_callback_urls(urls: list[str]) -> list[str]:
+    """For each origin URL, ensure both the base and /callback path are present.
+
+    Auth0 requires exact redirect_uri matching. The SPA PKCE flow redirects to
+    /callback, so we must include it alongside the base URL.
+    """
+    expanded: list[str] = []
+    for url in urls:
+        url = url.rstrip("/")
+        if url not in expanded:
+            expanded.append(url)
+        cb = url + "/callback"
+        if cb not in expanded:
+            expanded.append(cb)
+    return expanded
+
+
 def ensure_spa_client(
     mgmt: Auth0Mgmt,
     *,
@@ -715,12 +774,15 @@ def ensure_spa_client(
 ) -> dict:
     existing = mgmt.find_client_by_name(name)
 
+    # Auto-expand callbacks to include /callback path for SPA PKCE flow
+    expanded_callbacks = _expand_callback_urls(callbacks)
+
     payload = {
         "app_type": "spa",
         # SPA best-practice: no client secret.
         "token_endpoint_auth_method": "none",
         "grant_types": ["authorization_code", "refresh_token"],
-        "callbacks": callbacks,
+        "callbacks": expanded_callbacks,
         "allowed_logout_urls": logout_urls,
         "web_origins": origins,
         "allowed_origins": origins,
@@ -833,12 +895,14 @@ def load_settings() -> Settings:
     mgmt_client_id = _required_env("AUTH0_MGMT_CLIENT_ID").strip()
     mgmt_client_secret = _required_env("AUTH0_MGMT_CLIENT_SECRET").strip()
     audience = _required_env("AUTH0_AUDIENCE").strip()
+    user_audience = os.getenv("AUTH0_USER_AUDIENCE", audience).strip()
 
     return Settings(
         mgmt_domain=mgmt_domain,
         mgmt_client_id=mgmt_client_id,
         mgmt_client_secret=mgmt_client_secret,
         audience=audience,
+        user_audience=user_audience,
         api_name=os.getenv("AUTH0_API_NAME", "Fraud Rule Management API"),
         spa_name=os.getenv("AUTH0_SPA_APP_NAME", "Fraud Intelligence Portal"),
         m2m_name=os.getenv("AUTH0_M2M_APP_NAME", "Fraud Rule Management M2M"),
@@ -900,12 +964,16 @@ def ensure_test_users(
             user = existing
             if verbose:
                 print(f"  Test user exists: {email}")
-            # Note: We cannot update password for existing users easily
-            # If password was generated, warn that it won't apply to existing user
-            if password_was_generated:
-                print("    Warning: Generated password won't apply to existing user")
-                # Remove from sync since user already exists with different password
-                passwords_to_sync.pop(password_env, None)
+            # Update password for existing user to match Doppler
+            if password:
+                try:
+                    mgmt.update_user_password(user_id=user["user_id"], password=password)
+                    if verbose:
+                        print(f"    Password synced from {password_env}")
+                except Exception as e:
+                    print(f"    Warning: Could not update password for {email}: {e}")
+                    if password_was_generated:
+                        passwords_to_sync.pop(password_env, None)
         else:
             # Create user with password
             user = mgmt.create_user(
@@ -963,7 +1031,8 @@ def main() -> int:
         print("AUTH0 BOOTSTRAP - Card Fraud Platform")
         print("=" * 60)
         print(f"\nTenant: {settings.mgmt_domain}")
-        print(f"Audience: {settings.audience}")
+        print(f"Service audience: {settings.audience}")
+        print(f"User audience: {settings.user_audience}")
         print("\nThis will create/update:")
         print("  - API (Resource Server) with permissions")
         print("  - Platform roles (PLATFORM_ADMIN, RULE_MAKER, etc.)")
@@ -1066,7 +1135,7 @@ def main() -> int:
         elif args.verbose:
             print("  M2M client_secret not in response (existing client)")
             print(
-                "  To get secret: Auth0 Dashboard → Applications → Fraud Rule Management M2M → Settings"
+                "  To get secret: Auth0 Dashboard > Applications > Fraud Rule Management M2M > Settings"
             )
 
         # Step 7: Create/update Actions
@@ -1075,13 +1144,17 @@ def main() -> int:
             mgmt,
             action_name="Add Roles to Token",
             trigger_id="post-login",
-            code=_action_code_post_login(settings.audience),
+            code=_action_code_post_login(settings.user_audience),
             verbose=args.verbose,
         )
 
-        # Note: M2M tokens use scopes, not roles - skip M2M role injection
-        if args.verbose:
-            print("  Skipping M2M role injection (M2M uses scopes only)")
+        ensure_action_and_binding(
+            mgmt,
+            action_name="Normalize M2M Permissions",
+            trigger_id="credentials-exchange",
+            code=_action_code_credentials_exchange(settings.user_audience, []),
+            verbose=args.verbose,
+        )
 
         # Optional: Create test users
         if not args.skip_test_users:

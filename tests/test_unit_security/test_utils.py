@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from app.core.auth import AuthenticatedUser
 from app.core.security.utils import (
     ROLE_NAMES,
     get_user_id,
@@ -52,6 +53,18 @@ class TestGetUserRoles:
             assert roles == ["ADMIN", "MAKER"]
 
     @pytest.mark.anyio
+    async def test_get_user_roles_prefers_user_audience(self):
+        payload = {
+            "https://portal.example.com/roles": ["ADMIN"],
+            "https://service.example.com/roles": ["MAKER"],
+        }
+        with patch("app.core.security.utils.settings") as mock_settings:
+            mock_settings.auth0_user_audience = "https://portal.example.com"
+            mock_settings.auth0_audience = "https://service.example.com"
+            roles = get_user_roles(payload)
+            assert roles == ["ADMIN"]
+
+    @pytest.mark.anyio
     async def test_get_user_roles_missing(self):
         payload = {}
         roles = get_user_roles(payload)
@@ -80,8 +93,12 @@ class TestGetUserPermissions:
         assert permissions == ["rule:create", "rule:read"]
 
     @pytest.mark.anyio
-    async def test_get_user_permissions_from_scope(self):
-        payload = {"scope": "rule:create rule:read rule:update"}
+    async def test_get_user_permissions_m2m_with_injected_permissions(self):
+        """M2M tokens get permissions injected by onExecuteCredentialsExchange Action."""
+        payload = {
+            "gty": "client-credentials",
+            "permissions": ["rule:create", "rule:read", "rule:update"],
+        }
         permissions = get_user_permissions(payload)
         assert permissions == ["rule:create", "rule:read", "rule:update"]
 
@@ -92,10 +109,10 @@ class TestGetUserPermissions:
         assert permissions == []
 
     @pytest.mark.anyio
-    async def test_get_user_permissions_prefers_list(self):
-        payload = {"permissions": ["rule:create"], "scope": "rule:read"}
+    async def test_get_user_permissions_malformed(self):
+        payload = {"permissions": "not-a-list"}
         permissions = get_user_permissions(payload)
-        assert permissions == ["rule:create"]
+        assert permissions == []
 
 
 class TestHasPermission:
@@ -113,6 +130,19 @@ class TestHasPermission:
     async def test_has_permission_empty(self):
         payload = {}
         assert has_permission(payload, "rule:create") is False
+
+    @pytest.mark.anyio
+    async def test_has_permission_platform_admin_bypass(self):
+        payload = {"https://api.example.com/roles": ["PLATFORM_ADMIN"]}
+        with patch("app.core.security.utils.settings") as mock_settings:
+            mock_settings.auth0_user_audience = "https://api.example.com"
+            mock_settings.auth0_audience = "https://service.example.com"
+            assert has_permission(payload, "rule:create") is True
+
+    @pytest.mark.anyio
+    async def test_has_permission_authenticated_user_bypass(self):
+        user = AuthenticatedUser(user_id="user123", roles=["PLATFORM_ADMIN"], permissions=[])
+        assert has_permission(user, "rule:create") is True
 
 
 class TestIsM2MToken:
@@ -152,6 +182,35 @@ class TestGetUserId:
     async def test_get_user_id_none_sub(self):
         user = {"sub": None}
         assert get_user_id(user) == ""
+
+    @pytest.mark.anyio
+    async def test_get_user_id_authenticated_user(self):
+        user = AuthenticatedUser(user_id="auth0|999999")
+        assert get_user_id(user) == "auth0|999999"
+
+
+class TestAuthenticatedUser:
+    @pytest.mark.anyio
+    async def test_authenticated_user_fraud_analyst_admin_bypass(self):
+        user = AuthenticatedUser(user_id="user123", roles=["PLATFORM_ADMIN"])
+        assert user.is_fraud_analyst is True
+
+    @pytest.mark.anyio
+    async def test_authenticated_user_fraud_supervisor_admin_bypass(self):
+        user = AuthenticatedUser(user_id="user123", roles=["PLATFORM_ADMIN"])
+        assert user.is_fraud_supervisor is True
+
+    @pytest.mark.anyio
+    async def test_authenticated_user_fraud_analyst_role(self):
+        user = AuthenticatedUser(user_id="user123", roles=["FRAUD_ANALYST"])
+        assert user.is_fraud_analyst is True
+        assert user.is_fraud_supervisor is False
+
+    @pytest.mark.anyio
+    async def test_authenticated_user_fraud_supervisor_role(self):
+        user = AuthenticatedUser(user_id="user123", roles=["FRAUD_SUPERVISOR"])
+        assert user.is_fraud_supervisor is True
+        assert user.is_fraud_analyst is False
 
 
 class TestRoleNames:

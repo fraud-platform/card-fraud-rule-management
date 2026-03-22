@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
+from app.core.auth import AuthenticatedUser
 from app.core.dependencies import get_current_user
 
 
@@ -9,7 +10,7 @@ class TestDependencies:
     @pytest.mark.anyio
     async def test_get_current_user(self):
         # This is just a re-export, so test that it calls the underlying function
-        mock_user = {"sub": "user123"}
+        mock_user = AuthenticatedUser(user_id="user123")
 
         with patch("app.core.dependencies._get_current_user") as mock_get:
             mock_get.return_value = mock_user

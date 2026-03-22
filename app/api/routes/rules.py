@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
@@ -21,6 +21,7 @@ from app.api.schemas.rule import (
     RuleVersionResponse,
     RuleVersionSubmitRequest,
 )
+from app.core.auth import AuthenticatedUser
 from app.core.dependencies import AsyncDbSession
 from app.core.security import get_user_id, require_permission
 from app.repos.rule_repo import (
@@ -45,7 +46,7 @@ router = APIRouter(tags=["rules"])
 async def post_rule(
     payload: RuleCreate,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:create")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:create"))],
 ):
     """
     Create a new rule with an initial DRAFT version.
@@ -69,7 +70,7 @@ async def post_rule(
 @router.get("/rules")
 async def get_rules(
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:read")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:read"))],
     cursor: Annotated[
         str | None, Query(description="Base64-encoded cursor from previous page")
     ] = None,
@@ -105,7 +106,7 @@ async def get_rules(
 async def get_rule(
     rule_id: str,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:read")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:read"))],
 ):
     """Get a specific rule by ID.
 
@@ -123,7 +124,7 @@ async def post_rule_version(
     rule_id: str,
     payload: RuleVersionCreate,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:update")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:update"))],
 ):
     """
     Create a new version of an existing rule.
@@ -149,7 +150,7 @@ async def submit_version(
     rule_version_id: str,
     payload: RuleVersionSubmitRequest,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:submit")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:submit"))],
 ):
     """
     Submit a rule version for approval.
@@ -172,7 +173,7 @@ async def approve_version(
     rule_version_id: str,
     payload: RuleVersionApproveRequest,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:approve")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:approve"))],
 ):
     """
     Approve a rule version.
@@ -194,7 +195,7 @@ async def reject_version(
     rule_version_id: str,
     payload: RuleVersionRejectRequest,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:reject")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:reject"))],
 ):
     """
     Reject a rule version.
@@ -215,7 +216,7 @@ async def reject_version(
 async def get_rule_version_endpoint(
     rule_version_id: str,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:read")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:read"))],
 ):
     """
     Get a specific rule version by ID (for analyst deep links).
@@ -248,7 +249,7 @@ async def get_rule_version_endpoint(
 async def list_rule_versions_endpoint(
     rule_id: str,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:read")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:read"))],
 ):
     """
     List all versions for a specific rule (for analyst deep links).
@@ -284,7 +285,7 @@ async def list_rule_versions_endpoint(
 async def get_rule_summary_endpoint(
     rule_id: str,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:read")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:read"))],
 ):
     """
     Get rule summary with latest version info (lightweight response for analyst UI).
@@ -301,7 +302,7 @@ async def get_rule_summary_endpoint(
 async def simulate_rule(
     payload: RuleSimulateRequest,
     db: AsyncDbSession,
-    user: dict[str, Any] = Depends(require_permission("rule:read")),
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule:read"))],
 ):
     """
     Simulate a rule against historical transactions.

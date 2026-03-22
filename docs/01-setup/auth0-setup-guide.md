@@ -154,17 +154,20 @@ uv run auth0-bootstrap --yes --verbose
 ### 3.3 What Bootstrap Creates
 
 **Rule Management Bootstrap (Central Hub):**
-- API: `https://fraud-rule-management-api`
+- API audience (current backend audience): `https://fraud-governance-api`
+- Shared human-user audience: `https://fraud-governance-api`
 - Permissions: `rule:create`, `rule:update`, `rule:submit`, `rule:approve`, `rule:reject`, `rule:read`
 - Roles: `PLATFORM_ADMIN`, `RULE_MAKER`, `RULE_CHECKER`, `RULE_VIEWER`, `FRAUD_ANALYST`, `FRAUD_SUPERVISOR`
 - SPA App: `Fraud Intelligence Portal`
 - M2M App: `Fraud Rule Management M2M`
-- Actions: Role injection for tokens
+- Actions: Role injection for both access and ID tokens under the shared user namespace
 - Test Users: 6 users for Playwright
 - **Auto-synced to Doppler:**
   - `AUTH0_CLIENT_ID` - M2M client ID
   - `AUTH0_CLIENT_SECRET` - M2M client secret
   - `TEST_USER_*_PASSWORD` - 5 test user passwords (auto-generated)
+
+In the current bootstrap, `AUTH0_AUDIENCE` and `AUTH0_USER_AUDIENCE` are kept aligned for this repo; the split exists so the portal namespace can be migrated independently when the other backend services are ready.
 
 **Rule Engine Bootstrap:**
 - API: `https://fraud-rule-engine-api`
@@ -179,7 +182,7 @@ uv run auth0-bootstrap --yes --verbose
 - API: `https://fraud-transaction-management-api`
 - Permissions: `txn:view`, `txn:comment`, `txn:flag`, `txn:recommend`, `txn:approve`, `txn:block`, `txn:override`
 - M2M App: `Fraud Transaction Management M2M`
-- Uses shared roles (created by rule-management)
+- Uses shared roles (created by rule-management) and the shared user audience
 - **Auto-synced to Doppler:**
   - `AUTH0_CLIENT_ID` - M2M client ID
   - `AUTH0_CLIENT_SECRET` - M2M client secret
@@ -213,11 +216,7 @@ Create `.env.local` in intelligence-portal:
 # Auth0 Configuration
 VITE_AUTH0_DOMAIN=dev-gix6qllz7yvs0rl8.us.auth0.com
 VITE_AUTH0_CLIENT_ID=<spa-client-id-from-dashboard>
-
-# API Audiences
-VITE_AUTH0_AUDIENCE_RULE_MANAGEMENT=https://fraud-rule-management-api
-VITE_AUTH0_AUDIENCE_RULE_ENGINE=https://fraud-rule-engine-api
-VITE_AUTH0_AUDIENCE_TRANSACTION_MGMT=https://fraud-transaction-management-api
+VITE_AUTH0_AUDIENCE=https://fraud-governance-api
 
 # API Base URLs
 VITE_API_URL_RULE_MANAGEMENT=http://localhost:8000/api/v1
@@ -244,7 +243,7 @@ import { Auth0Provider } from '@auth0/auth0-react';
   clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
   authorizationParams={{
     redirect_uri: window.location.origin,
-    audience: import.meta.env.VITE_AUTH0_AUDIENCE_RULE_MANAGEMENT,
+    audience: import.meta.env.VITE_AUTH0_AUDIENCE,
     scope: 'openid profile email',
   }}
   cacheLocation="localstorage"
@@ -263,7 +262,7 @@ export const useAuth = () => {
   const { user, getAccessTokenSilently } = useAuth0();
 
   // Get roles from token
-  const roles = user?.['https://fraud-rule-management-api/roles'] || [];
+  const roles = user?.['https://fraud-governance-api/roles'] || [];
 
   // Role checks
   const isPlatformAdmin = roles.includes('PLATFORM_ADMIN');
@@ -399,14 +398,15 @@ AUTH0_MGMT_CLIENT_ID: 35qSlob1zX4TiYnMq7Ner51GHdgAuMzl
 AUTH0_MGMT_CLIENT_SECRET: <secret>
 
 # API Configuration - AUTO-SYNCED BY BOOTSTRAP
-AUTH0_AUDIENCE: https://fraud-rule-management-api
+AUTH0_AUDIENCE: https://fraud-governance-api
+AUTH0_USER_AUDIENCE: https://fraud-governance-api
 AUTH0_DOMAIN: dev-gix6qllz7yvs0rl8.us.auth0.com
 AUTH0_CLIENT_ID: <auto-synced-by-bootstrap>
 AUTH0_CLIENT_SECRET: <auto-synced-by-bootstrap>
 
 # SPA Configuration - MANUAL SETUP REQUIRED
 AUTH0_SPA_APP_NAME: Fraud Intelligence Portal
-AUTH0_SPA_CALLBACK_URLS: http://localhost:3000,http://localhost:5173
+AUTH0_SPA_CALLBACK_URLS: http://localhost:3000/callback,http://localhost:5173/callback
 AUTH0_SPA_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
 AUTH0_SPA_ALLOWED_LOGOUT_URLS: http://localhost:3000,http://localhost:5173
 
@@ -437,4 +437,3 @@ doppler secrets set --project card-fraud-intelligence-portal --config local \
 ---
 
 **End of Document**
-

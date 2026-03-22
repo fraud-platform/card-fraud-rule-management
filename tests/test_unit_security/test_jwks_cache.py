@@ -344,6 +344,25 @@ class TestAsyncHttpClient:
         assert isinstance(client1, httpx.AsyncClient)
 
     @pytest.mark.anyio
+    async def test_get_async_http_client_recreates_closed_client(self):
+        import app.core.security.jwks_cache as jwks_module
+        from app.core.security.jwks_cache import get_async_http_client
+
+        closed_client = MagicMock()
+        closed_client.is_closed = True
+        jwks_module._async_http = closed_client
+
+        with patch("app.core.security.jwks_cache.httpx.AsyncClient") as mock_async_client:
+            new_client = MagicMock()
+            new_client.is_closed = False
+            mock_async_client.return_value = new_client
+
+            client = get_async_http_client()
+
+            assert client is new_client
+            mock_async_client.assert_called_once()
+
+    @pytest.mark.anyio
     async def test_close_async_http_client(self):
         # Set _async_http to None for testing
         import app.core.security.jwks_cache as jwks_module

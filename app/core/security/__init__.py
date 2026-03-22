@@ -16,6 +16,7 @@ import logging
 
 from jose import JWTError, jwt
 
+from app.core.auth import AuthenticatedUser
 from app.core.config import settings
 
 from .circuit_breaker import (
@@ -45,6 +46,7 @@ from .permissions import (
     M2M_PERMISSIONS,
     require_permission,
     require_role,
+    require_roles,
 )
 from .utils import (
     ROLE_NAMES,
@@ -65,6 +67,7 @@ __all__ = [
     "CircuitBreaker",
     "CircuitBreakerOpenError",
     "CircuitBreakerState",
+    "AuthenticatedUser",
     "INVALID_OR_EXPIRED_TOKEN_MSG",
     "JWTError",
     "logger",
@@ -90,6 +93,7 @@ __all__ = [
     "jwt",
     "require_permission",
     "require_role",
+    "require_roles",
     "security",
     "verify_token",
     "verify_token_async",

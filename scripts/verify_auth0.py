@@ -270,11 +270,11 @@ class Auth0Verifier:
             data = resp.json()
             actions = data.get("actions", data) if isinstance(data, dict) else data
 
-            # Note: M2M tokens use scopes only, so we only check for the post-login action
-            expected_actions = ["Add Roles to Token"]
+            # Rule-management owns both the human-user post-login action and the shared
+            # credentials-exchange action for M2M permission normalization.
+            expected_actions = ["Add Roles to Token", "Normalize M2M Permissions"]
             found = []
             deployed = []
-
             for action in actions:
                 name = action.get("name", "")
                 if name in expected_actions:
@@ -318,11 +318,10 @@ class Auth0Verifier:
     def verify_trigger_bindings(self) -> VerificationResult:
         """Check if actions are bound to correct triggers."""
         try:
-            # Note: M2M tokens use scopes only, so we only check post-login trigger
-            triggers_to_check = ["post-login"]
+            triggers_to_check = {"post-login": "Add Roles to Token", "credentials-exchange": "Normalize M2M Permissions"}
             bound_triggers = []
 
-            for trigger in triggers_to_check:
+            for trigger, expected_action in triggers_to_check.items():
                 resp = self.client.get(f"actions/triggers/{trigger}/bindings")
                 resp.raise_for_status()
                 data = resp.json()
@@ -331,7 +330,7 @@ class Auth0Verifier:
                 for binding in bindings:
                     action = binding.get("action", {})
                     action_name = action.get("name", "")
-                    if "Roles" in action_name:
+                    if action_name == expected_action:
                         bound_triggers.append(trigger)
                         break
 
@@ -443,6 +442,7 @@ def main():
     mgmt_client_id = os.getenv("AUTH0_MGMT_CLIENT_ID")
     mgmt_client_secret = os.getenv("AUTH0_MGMT_CLIENT_SECRET")
     audience = os.getenv("AUTH0_AUDIENCE")
+    user_audience = os.getenv("AUTH0_USER_AUDIENCE") or audience
     m2m_name = os.getenv("AUTH0_M2M_APP_NAME", "Fraud Rule Management M2M")
 
     missing = []
@@ -454,6 +454,8 @@ def main():
         missing.append("AUTH0_MGMT_CLIENT_SECRET")
     if not audience:
         missing.append("AUTH0_AUDIENCE")
+    if not user_audience:
+        missing.append("AUTH0_USER_AUDIENCE")
 
     if missing:
         print(f"ERROR: Missing required environment variables: {', '.join(missing)}")
@@ -463,7 +465,8 @@ def main():
 
     print("Verifying Auth0 configuration...")
     print(f"  Domain: {mgmt_domain}")
-    print(f"  Audience: {audience}")
+    print(f"  Service Audience: {audience}")
+    print(f"  User Audience: {user_audience}")
     print(f"  M2M App: {m2m_name}")
 
     # Get management token

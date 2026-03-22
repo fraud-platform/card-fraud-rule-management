@@ -29,7 +29,7 @@ _http = httpx.Client(timeout=httpx.Timeout(10.0))
 def get_async_http_client() -> httpx.AsyncClient:
     """Get or create the async HTTP client singleton."""
     global _async_http
-    if _async_http is None:
+    if _async_http is None or _async_http.is_closed:
         _async_http = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
     return _async_http
 
@@ -38,7 +38,8 @@ async def close_async_http_client() -> None:
     """Close the async HTTP client (for graceful shutdown)."""
     global _async_http
     if _async_http is not None:
-        await _async_http.aclose()
+        if not _async_http.is_closed:
+            await _async_http.aclose()
         _async_http = None
 
 

@@ -15,14 +15,20 @@ not be used in new code.
 
 import warnings
 from collections.abc import AsyncGenerator, Generator
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from app.core.auth import AuthenticatedUser
 from app.core.db import get_async_sessionmaker, get_db_session
-from app.core.security import get_current_user as _get_current_user
+from app.core.security import (
+    get_current_user as _get_current_user,
+)
+from app.core.security import (
+    require_permission,
+)
 
 # ============================================================================
 # Database Dependencies
@@ -86,7 +92,9 @@ def get_db() -> Generator[Session]:
 # ============================================================================
 
 
-def get_current_user(user: dict[str, Any] = Depends(_get_current_user)) -> dict[str, Any]:
+def get_current_user(
+    user: AuthenticatedUser = Depends(_get_current_user),
+) -> AuthenticatedUser:
     """
     Re-export of get_current_user from security module.
 
@@ -97,7 +105,7 @@ def get_current_user(user: dict[str, Any] = Depends(_get_current_user)) -> dict[
     Usage:
         @router.get("/profile")
         def get_profile(user: CurrentUser):
-            return {"user_id": user["sub"]}
+            return {"user_id": user.user_id}
 
     For permission-based authorization, use require_permission() directly:
         from app.core.security import require_permission
@@ -111,13 +119,90 @@ def get_current_user(user: dict[str, Any] = Depends(_get_current_user)) -> dict[
             ...
 
     Returns:
-        Decoded JWT payload containing user information
+        AuthenticatedUser object containing user information
     """
     return user
 
 
 # Type alias for authenticated user dependency
-CurrentUser = Annotated[dict[str, Any], Depends(get_current_user)]
+CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
+
+
+# Rule-management typed dependency aliases
+RequireRuleCreate = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("rule:create")),
+]
+RequireRuleRead = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("rule:read")),
+]
+RequireRuleUpdate = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("rule:update")),
+]
+RequireRuleSubmit = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("rule:submit")),
+]
+RequireRuleApprove = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("rule:approve")),
+]
+RequireRuleReject = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("rule:reject")),
+]
+
+RequireRuleFieldCreate = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("rule_field:create")),
+]
+RequireRuleFieldRead = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("rule_field:read")),
+]
+RequireRuleFieldUpdate = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("rule_field:update")),
+]
+RequireRuleFieldDelete = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("rule_field:delete")),
+]
+
+RequireRuleSetCreate = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("ruleset:create")),
+]
+RequireRuleSetRead = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("ruleset:read")),
+]
+RequireRuleSetUpdate = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("ruleset:update")),
+]
+RequireRuleSetSubmit = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("ruleset:submit")),
+]
+RequireRuleSetApprove = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("ruleset:approve")),
+]
+RequireRuleSetReject = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("ruleset:reject")),
+]
+RequireRuleSetActivate = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("ruleset:activate")),
+]
+RequireRuleSetCompile = Annotated[
+    AuthenticatedUser,
+    Depends(require_permission("ruleset:compile")),
+]
 
 
 # ============================================================================
@@ -126,22 +211,22 @@ CurrentUser = Annotated[dict[str, Any], Depends(get_current_user)]
 # NOTE: These are provided for test compatibility only. Use require_permission() in new code.
 
 
-def require_admin(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+def require_admin(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
     """Legacy dependency for tests. Use require_permission() in new code."""
     return user
 
 
-def require_maker(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+def require_maker(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
     """Legacy dependency for tests. Use require_permission() in new code."""
     return user
 
 
-def require_checker(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+def require_checker(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
     """Legacy dependency for tests. Use require_permission() in new code."""
     return user
 
 
 # Type aliases for legacy dependencies (for test compatibility only)
-RequireAdmin = Annotated[dict[str, Any], Depends(require_admin)]
-RequireMaker = Annotated[dict[str, Any], Depends(require_maker)]
-RequireChecker = Annotated[dict[str, Any], Depends(require_checker)]
+RequireAdmin = Annotated[AuthenticatedUser, Depends(require_admin)]
+RequireMaker = Annotated[AuthenticatedUser, Depends(require_maker)]
+RequireChecker = Annotated[AuthenticatedUser, Depends(require_checker)]

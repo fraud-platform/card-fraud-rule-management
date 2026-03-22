@@ -150,6 +150,7 @@ class TestGenerateTestToken:
             mock_settings.auth0_client_secret = "test-client-secret"
             mock_settings.auth0_domain = "test.auth0.com"
             mock_settings.auth0_audience = "https://test-api"
+            mock_settings.auth0_user_audience_resolved = "https://portal.example.com"
 
             from app.main import create_app
 
@@ -176,6 +177,7 @@ class TestGenerateTestToken:
             call_args = mock_client_instance.post.call_args
             assert "test.auth0.com" in call_args[0][0]
             assert "/oauth/token" in call_args[0][0]
+            assert call_args.kwargs["json"]["audience"] == "https://test-api"
 
     @patch("app.api.routes.test_utils.httpx.AsyncClient")
     @pytest.mark.anyio
@@ -202,6 +204,7 @@ class TestGenerateTestToken:
             mock_settings.auth0_client_secret = "bad-client-secret"
             mock_settings.auth0_domain = "test.auth0.com"
             mock_settings.auth0_audience = "https://test-api"
+            mock_settings.auth0_user_audience_resolved = "https://portal.example.com"
 
             from app.main import create_app
 
@@ -236,6 +239,7 @@ class TestGenerateTestToken:
             mock_settings.auth0_client_secret = "test-client-secret"
             mock_settings.auth0_domain = "test.auth0.com"
             mock_settings.auth0_audience = "https://test-api"
+            mock_settings.auth0_user_audience_resolved = "https://portal.example.com"
 
             from app.main import create_app
 

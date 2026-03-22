@@ -5,6 +5,7 @@ Provides helper functions for extracting user information from JWT payloads
 and defines role and permission constants used throughout the application.
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 from app.core.config import settings
@@ -20,7 +21,42 @@ ROLE_NAMES = {
 }
 
 
-def get_user_sub(payload: dict[str, Any]) -> str:
+def _get_claim_value(payload: Any, claim: str, default: Any = None) -> Any:
+    """Return a claim/value from a JWT payload or typed user object."""
+    if isinstance(payload, Mapping):
+        return payload.get(claim, default)
+    return getattr(payload, claim, default)
+
+
+def _resolve_audience_candidates() -> list[str]:
+    """Return configured audiences in precedence order.
+
+    Tests often patch ``settings`` with a plain mock, so this helper must
+    tolerate missing properties and fall back to the underlying environment
+    values.
+    """
+
+    candidates = getattr(settings, "auth0_audience_candidates", None)
+    if isinstance(candidates, (list, tuple)):
+        resolved = [
+            str(value).strip() for value in candidates if isinstance(value, str) and value.strip()
+        ]
+        if resolved:
+            return resolved
+
+    resolved: list[str] = []
+    for value in (
+        getattr(settings, "auth0_user_audience", None),
+        getattr(settings, "auth0_audience", None),
+    ):
+        if isinstance(value, str):
+            trimmed = value.strip()
+            if trimmed and trimmed not in resolved:
+                resolved.append(trimmed)
+    return resolved
+
+
+def get_user_sub(payload: Any) -> str:
     """
     Extract the Auth0 subject (user ID) from the JWT payload.
 
@@ -40,14 +76,14 @@ def get_user_sub(payload: dict[str, Any]) -> str:
 
     logger = logging.getLogger(__name__)
 
-    sub = payload.get("sub")
+    sub = _get_claim_value(payload, "sub")
     if not sub:
         logger.error("JWT payload missing 'sub' claim")
         raise UnauthorizedError("Invalid token - missing user identifier")
     return sub
 
 
-def get_user_id(user: dict[str, Any]) -> str:
+def get_user_id(user: Any) -> str:
     """
     Extract user ID from JWT user dict.
 
@@ -66,19 +102,20 @@ def get_user_id(user: dict[str, Any]) -> str:
             created_by = get_user_id(user)
             ...
     """
-    sub = user.get("sub")
+    sub = _get_claim_value(user, "sub")
     if not sub:
         return ""
     return str(sub)
 
 
-def get_user_roles(payload: dict[str, Any]) -> list[str]:
+def get_user_roles(payload: Any) -> list[str]:
     """
     Extract user roles from the JWT payload.
 
     Roles are stored in a custom namespaced claim to avoid conflicts
-    with standard JWT claims. The claim key uses the API audience:
-    '{AUTH0_AUDIENCE}/roles' (e.g., 'https://fraud-rule-management-api/roles')
+    with standard JWT claims. The preferred claim key uses the unified
+    user audience:
+    '{AUTH0_USER_AUDIENCE}/roles'
 
     Note: This returns the raw roles from the token. For authorization in
     endpoints, prefer using require_permission() which works for both
@@ -108,17 +145,27 @@ def get_user_roles(payload: dict[str, Any]) -> list[str]:
 
     logger = logging.getLogger(__name__)
 
-    roles_claim = f"{settings.auth0_audience}/roles"
-    roles = payload.get(roles_claim, [])
-
-    if not isinstance(roles, list):
+    for audience in _resolve_audience_candidates():
+        roles_claim = f"{audience}/roles"
+        roles = _get_claim_value(payload, roles_claim)
+        if roles is None:
+            continue
+        if isinstance(roles, list):
+            return roles
         logger.warning(f"Roles claim is not a list: {type(roles)}")
         return []
 
-    return roles
+    legacy_roles = _get_claim_value(payload, "roles", [])
+    if isinstance(legacy_roles, list):
+        return legacy_roles
+
+    if legacy_roles:
+        logger.warning(f"Roles claim is not a list: {type(legacy_roles)}")
+
+    return []
 
 
-def is_m2m_token(payload: dict[str, Any]) -> bool:
+def is_m2m_token(payload: Any) -> bool:
     """
     Check if the token is a Machine-to-Machine (service account) token.
 
@@ -134,15 +181,17 @@ def is_m2m_token(payload: dict[str, Any]) -> bool:
     Returns:
         True if this is an M2M token, False otherwise
     """
-    return payload.get("gty") == "client-credentials"
+    return _get_claim_value(payload, "gty") == "client-credentials"
 
 
-def get_user_permissions(payload: dict[str, Any]) -> list[str]:
+def get_user_permissions(payload: Any) -> list[str]:
     """
     Extract permissions from the JWT payload.
 
-    For human user tokens, permissions are in the 'permissions' claim.
-    For M2M tokens, permissions are in the 'permissions' claim or 'scope' claim.
+    Auth0 adds permissions to human user tokens when RBAC is enabled.
+    M2M tokens get permissions injected by the onExecuteCredentialsExchange
+    Action (deployed by this repo's bootstrap). Both token types use the
+    top-level 'permissions' array claim.
 
     Args:
         payload: Decoded JWT payload from verify_token()
@@ -151,22 +200,24 @@ def get_user_permissions(payload: dict[str, Any]) -> list[str]:
         List of permission strings (e.g., ['rule:create', 'rule:read'])
         Returns empty list if no permissions are present
     """
-    permissions = payload.get("permissions", [])
-    if isinstance(permissions, list) and permissions:
+    permissions = _get_claim_value(payload, "permissions", [])
+    if isinstance(permissions, list):
         return permissions
-
-    scope = payload.get("scope", "")
-    if isinstance(scope, str):
-        return scope.split()
 
     return []
 
 
-def has_permission(payload: dict[str, Any], required_permission: str) -> bool:
+def is_platform_admin(payload: Any) -> bool:
+    """Return True when the payload/user has the PLATFORM_ADMIN role."""
+    return "PLATFORM_ADMIN" in get_user_roles(payload)
+
+
+def has_permission(payload: Any, required_permission: str) -> bool:
     """
     Check if the token has the required permission.
 
     Works for both human user tokens and M2M tokens.
+    PLATFORM_ADMIN is treated as an allow-all bypass for defense in depth.
 
     Args:
         payload: Decoded JWT payload
@@ -175,5 +226,8 @@ def has_permission(payload: dict[str, Any], required_permission: str) -> bool:
     Returns:
         True if the token has the required permission, False otherwise
     """
+    if is_platform_admin(payload):
+        return True
+
     permissions = get_user_permissions(payload)
     return required_permission in permissions

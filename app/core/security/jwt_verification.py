@@ -12,10 +12,12 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
+from app.core.auth import AuthenticatedUser
 from app.core.config import settings
 from app.core.errors import UnauthorizedError
 
 from .jwks_cache import get_jwks, get_jwks_async
+from .utils import _resolve_audience_candidates, get_user_permissions, get_user_roles
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +72,38 @@ def get_rsa_key(token: str) -> dict[str, Any]:
     return _extract_rsa_key_from_jwks(jwks, unverified_header["kid"])
 
 
+def _decode_with_supported_audiences(token: str, rsa_key: dict[str, Any]) -> dict[str, Any]:
+    """Decode a token against every configured audience until one matches."""
+    last_claims_error: Exception | None = None
+    audiences = _resolve_audience_candidates()
+    if not audiences:
+        logger.error("No Auth0 audience configured")
+        raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
+
+    for audience in audiences:
+        try:
+            return jwt.decode(
+                token,
+                rsa_key,
+                algorithms=settings.auth0_algorithms_list,
+                audience=audience,
+                issuer=f"https://{settings.auth0_domain}/",
+            )
+        except _ExpiredSignatureError:
+            logger.warning("Token has expired")
+            raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
+        except _JWTClaimsError as e:
+            last_claims_error = e
+            continue
+        except JWTError as e:
+            logger.warning(f"JWT verification failed: {e}")
+            raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
+
+    if last_claims_error is not None:
+        logger.warning(f"Invalid token claims: {last_claims_error}")
+    raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
+
+
 def verify_token(token: str) -> dict[str, Any]:
     """
     Verify JWT token against Auth0 and return the decoded payload (sync version).
@@ -77,7 +111,7 @@ def verify_token(token: str) -> dict[str, Any]:
     Performs comprehensive verification:
     - Signature verification using Auth0 public key
     - Issuer validation (must match AUTH0_DOMAIN)
-    - Audience validation (must match AUTH0_AUDIENCE)
+    - Audience validation (must match the configured user or service audience)
     - Expiration check
     - Algorithm validation (RS256)
 
@@ -93,28 +127,11 @@ def verify_token(token: str) -> dict[str, Any]:
     rsa_key = get_rsa_key(token)
 
     try:
-        payload = jwt.decode(
-            token,
-            rsa_key,
-            algorithms=settings.auth0_algorithms_list,
-            audience=settings.auth0_audience,
-            issuer=f"https://{settings.auth0_domain}/",
-        )
+        payload = _decode_with_supported_audiences(token, rsa_key)
         logger.debug(f"Token verified successfully for subject: {payload.get('sub')}")
         return payload
-
-    except _ExpiredSignatureError:
-        logger.warning("Token has expired")
-        raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
-
-    except _JWTClaimsError as e:
-        logger.warning(f"Invalid token claims: {e}")
-        raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
-
-    except JWTError as e:
-        logger.warning(f"JWT verification failed: {e}")
-        raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
-
+    except UnauthorizedError:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error during token verification: {e}")
         raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
@@ -154,7 +171,7 @@ async def verify_token_async(token: str) -> dict[str, Any]:
     Performs comprehensive verification:
     - Signature verification using Auth0 public key
     - Issuer validation (must match AUTH0_DOMAIN)
-    - Audience validation (must match AUTH0_AUDIENCE)
+    - Audience validation (must match the configured user or service audience)
     - Expiration check
     - Algorithm validation (RS256)
 
@@ -170,50 +187,31 @@ async def verify_token_async(token: str) -> dict[str, Any]:
     rsa_key = await get_rsa_key_async(token)
 
     try:
-        payload = jwt.decode(
-            token,
-            rsa_key,
-            algorithms=settings.auth0_algorithms_list,
-            audience=settings.auth0_audience,
-            issuer=f"https://{settings.auth0_domain}/",
-        )
+        payload = _decode_with_supported_audiences(token, rsa_key)
         logger.debug(f"Token verified successfully for subject: {payload.get('sub')}")
         return payload
-
-    except _ExpiredSignatureError:
-        logger.warning("Token has expired")
-        raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
-
-    except _JWTClaimsError as e:
-        logger.warning(f"Invalid token claims: {e}")
-        raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
-
-    except JWTError as e:
-        logger.warning(f"JWT verification failed: {e}")
-        raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
-
+    except UnauthorizedError:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error during token verification: {e}")
         raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
 
 
-def _create_bypass_user() -> dict[str, Any]:
+def _create_bypass_user() -> AuthenticatedUser:
     """
     Create a mock user for local development when JWT validation is bypassed.
 
     Returns a user with PLATFORM_ADMIN role to allow all operations for local testing.
     This is ONLY used when SECURITY_SKIP_JWT_VALIDATION=True and APP_ENV=local.
     """
-    # Import os here to avoid circular import
-    import os
-
-    audience = os.environ.get("AUTH0_AUDIENCE", "https://card-fraud-governance-api")
-    domain = os.environ.get("AUTH0_DOMAIN", "local.auth0.com")
-
-    return {
-        "sub": "local-dev-user",
-        f"{audience}/roles": ["PLATFORM_ADMIN"],
-        "permissions": [
+    # Keep the bypass user aligned with the transaction-management model:
+    # a typed authenticated user with PLATFORM_ADMIN access and full rule permissions.
+    return AuthenticatedUser(
+        user_id="local-dev-user",
+        email="local-dev@example.com",
+        name="Local Development User",
+        roles=["PLATFORM_ADMIN"],
+        permissions=[
             # Rule Management
             "rule:create",
             "rule:update",
@@ -236,15 +234,12 @@ def _create_bypass_user() -> dict[str, Any]:
             "ruleset:compile",
             "ruleset:read",
         ],
-        "aud": audience,
-        "iss": f"https://{domain}/",
-        "exp": 9999999999,  # Far future expiration
-    }
+    )
 
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_optional_security),
-) -> dict[str, Any]:
+) -> AuthenticatedUser:
     """
     FastAPI dependency to extract and verify the current user from JWT (async version).
 
@@ -257,14 +252,14 @@ async def get_current_user(
     Usage:
         @router.get("/protected")
         async def protected_endpoint(user: dict = Depends(get_current_user)):
-            user_id = user["sub"]
+            user_id = user.user_id
             return {"message": f"Hello {user_id}"}
 
     Args:
         credentials: Automatically extracted by HTTPBearer (optional when bypass enabled)
 
     Returns:
-        Decoded JWT payload containing user information
+        AuthenticatedUser containing user information
 
     Raises:
         UnauthorizedError: If token is missing or invalid
@@ -281,4 +276,11 @@ async def get_current_user(
         raise UnauthorizedError(INVALID_OR_EXPIRED_TOKEN_MSG)
 
     token = credentials.credentials
-    return await verify_token_async(token)
+    payload = await verify_token_async(token)
+    return AuthenticatedUser(
+        user_id=payload.get("sub", ""),
+        email=payload.get("email"),
+        name=payload.get("name"),
+        roles=get_user_roles(payload),
+        permissions=get_user_permissions(payload),
+    )

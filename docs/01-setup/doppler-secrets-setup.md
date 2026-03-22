@@ -46,7 +46,8 @@ This guide covers setting up Doppler secrets for the **card-fraud-rule-managemen
 | `POSTGRES_ADMIN_PASSWORD` | `postgres` | Local admin password |
 | `NEON_API_KEY` | (from Neon console) | Neon API access |
 | `AUTH0_DOMAIN` | `your-tenant.auth0.com` | Auth0 authentication |
-| `AUTH0_AUDIENCE` | `https://fraud-governance-api` | Auth0 API audience |
+| `AUTH0_AUDIENCE` | `https://fraud-governance-api` | Current service audience |
+| `AUTH0_USER_AUDIENCE` | `https://fraud-governance-api` | Shared human-user audience |
 | `AUTH0_MGMT_CLIENT_ID` | (from Auth0) | Auth0 Management API |
 | `AUTH0_MGMT_CLIENT_SECRET` | (from Auth0) | Auth0 Management API secret |
 
@@ -61,7 +62,8 @@ This guide covers setting up Doppler secrets for the **card-fraud-rule-managemen
 | `FRAUD_GOV_ANALYTICS_PASSWORD` | (generated) | Analytics user password |
 | `FRAUD_GOV_ADMIN_PASSWORD` | (generated) | Admin user password |
 | `AUTH0_DOMAIN` | `your-tenant.auth0.com` | Auth0 |
-| `AUTH0_AUDIENCE` | `https://fraud-governance-api` | Auth0 |
+| `AUTH0_AUDIENCE` | `https://fraud-governance-api` | Auth0 service audience |
+| `AUTH0_USER_AUDIENCE` | `https://fraud-governance-api` | Auth0 shared user audience |
 
 ### Prod Config (Neon Main Branch)
 
@@ -74,7 +76,8 @@ This guide covers setting up Doppler secrets for the **card-fraud-rule-managemen
 | `FRAUD_GOV_ANALYTICS_PASSWORD` | (generated) | Analytics user password |
 | `FRAUD_GOV_ADMIN_PASSWORD` | (generated) | Admin user password |
 | `AUTH0_DOMAIN` | `your-tenant.auth0.com` | Auth0 |
-| `AUTH0_AUDIENCE` | `https://fraud-governance-api` | Auth0 |
+| `AUTH0_AUDIENCE` | `https://fraud-governance-api` | Auth0 service audience |
+| `AUTH0_USER_AUDIENCE` | `https://fraud-governance-api` | Auth0 shared user audience |
 
 ## First-Time Setup
 

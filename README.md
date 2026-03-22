@@ -9,6 +9,7 @@ This project uses **Doppler** for secrets.
 - Do not use `.env` files.
 - Do not run `uv run test` / `uv run dev` directly.
 - Use Doppler wrappers only.
+- Auth0 setup is centralized here: `AUTH0_AUDIENCE` is the service audience, and `AUTH0_USER_AUDIENCE` is the shared user audience for the portal.
 
 ## Quick Start (PowerShell)
 
@@ -53,6 +54,10 @@ uv run openapi
 - Agent instructions: `AGENTS.md`
 - Auth model: `docs/07-reference/auth-model.md`
 - Auth0 setup: `docs/01-setup/auth0-setup-guide.md`
+- `uv run auth0-bootstrap --yes --verbose` also deploys the shared credentials-exchange Action that mirrors issued M2M access-token scopes into `permissions`.
+- Backend permission checks grant `PLATFORM_ADMIN` a defense-in-depth bypass.
+- The auth boundary now returns typed `AuthenticatedUser` objects instead of raw JWT dicts.
+- `AuthenticatedUser` exposes fraud-analyst and fraud-supervisor helpers, and 403 permission errors are sanitized by default.
 
 ## Common Commands
 

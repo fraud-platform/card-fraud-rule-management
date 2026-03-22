@@ -3,6 +3,11 @@
 FastAPI control-plane service for rule authoring, approvals, and artifact publishing.
 
 Observability note: HTTP metrics labels use normalized route templates (no raw path labels).
+Auth0 note: the shared portal audience lives in `AUTH0_USER_AUDIENCE`; `AUTH0_AUDIENCE` remains the service audience for this API.
+Auth0 bootstrap note: `uv run auth0-bootstrap --yes --verbose` also deploys the shared credentials-exchange Action that mirrors issued M2M access-token scopes into `permissions`.
+Authorization note: backend permission checks treat `PLATFORM_ADMIN` as a defense-in-depth allow-all bypass.
+Auth boundary note: request auth now resolves to typed `AuthenticatedUser` objects instead of raw JWT dicts.
+Auth helper note: `AuthenticatedUser` includes fraud analyst/supervisor helpers, and permission failures are sanitized by default.
 
 ## Quick Start
 

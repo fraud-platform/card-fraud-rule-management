@@ -7,7 +7,7 @@ Permission-based authorization - endpoints require specific permissions.
 
 import logging
 import uuid
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,7 @@ from app.api.schemas.rule_field import (
     RuleFieldResponse,
     RuleFieldUpdate,
 )
+from app.core.auth import AuthenticatedUser
 from app.core.dependencies import AsyncDbSession, CurrentUser
 from app.core.errors import NotFoundError
 from app.core.security import get_user_sub, require_permission
@@ -179,7 +180,7 @@ async def get_rule_field(
 async def create_rule_field(
     field: RuleFieldCreate,
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("rule_field:create"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule_field:create"))],
 ) -> RuleField:
     """Create a new rule field (Admin only)."""
     new_field = await rule_field_repo.create_rule_field(db, field, get_user_sub(user))
@@ -250,7 +251,7 @@ async def update_rule_field(
     field_key: Annotated[str, Path(description="Unique field identifier")],
     updates: RuleFieldUpdate,
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("rule_field:update"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule_field:update"))],
 ) -> RuleField:
     """Update a rule field (Admin only, partial updates)."""
     # Capture old state for audit
@@ -429,7 +430,7 @@ async def upsert_metadata(
     meta_key: Annotated[str, Path(description="Metadata key")],
     metadata: RuleFieldMetadataCreate,
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("rule_field:update"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule_field:update"))],
 ) -> RuleFieldMetadata:
     """Create or update metadata for a field (Admin only)."""
     # Check if metadata already exists (for audit logging)
@@ -509,7 +510,7 @@ async def delete_metadata(
     field_key: Annotated[str, Path(description="Unique field identifier")],
     meta_key: Annotated[str, Path(description="Metadata key")],
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("rule_field:delete"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule_field:delete"))],
 ) -> None:
     """Delete a metadata entry (Admin only)."""
     # Capture old state for audit

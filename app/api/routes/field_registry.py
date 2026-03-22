@@ -7,12 +7,13 @@ Permission-based authorization - endpoints require specific permissions.
 
 import logging
 import uuid
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.rule_field import FieldRegistryManifestResponse
+from app.core.auth import AuthenticatedUser
 from app.core.dependencies import AsyncDbSession, CurrentUser
 from app.core.security import get_user_sub, require_permission
 from app.db.models import AuditLog
@@ -201,7 +202,7 @@ async def get_registry_version_fields(
 )
 async def get_next_field_id(
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("rule_field:create"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule_field:create"))],
 ) -> dict:
     """Get next available field_id."""
     next_id = await rule_field_repo.get_next_field_id(db)
@@ -229,7 +230,7 @@ async def get_next_field_id(
 )
 async def publish_registry(
     db: AsyncDbSession,
-    user: Annotated[dict[str, Any], Depends(require_permission("rule_field:create"))],
+    user: Annotated[AuthenticatedUser, Depends(require_permission("rule_field:create"))],
 ) -> dict:
     """Publish field registry to S3."""
     from app.services.field_registry_publisher import FieldRegistryPublisher

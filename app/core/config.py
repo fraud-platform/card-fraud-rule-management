@@ -130,6 +130,7 @@ class Settings(BaseSettings):
     # Auth0 Configuration
     auth0_domain: str
     auth0_audience: str
+    auth0_user_audience: str | None = Field(default=None, validation_alias="AUTH0_USER_AUDIENCE")
     auth0_algorithms: str = "RS256"
 
     # Auth0 Client Credentials (for testing/development only)
@@ -137,6 +138,7 @@ class Settings(BaseSettings):
     auth0_client_secret: str | None = None
 
     # Security Configuration
+    sanitize_errors: bool = True
     # Local Development: Skip JWT validation for e2e load testing
     # SECURITY: ONLY allowed in LOCAL environment. Will raise error in TEST/PROD.
     # Set SECURITY_SKIP_JWT_VALIDATION=true in Doppler/.env for local testing
@@ -179,6 +181,20 @@ class Settings(BaseSettings):
     def auth0_algorithms_list(self) -> list[str]:
         """Parse Auth0 algorithms string into a list."""
         return [algo.strip() for algo in self.auth0_algorithms.split(",")]
+
+    @property
+    def auth0_user_audience_resolved(self) -> str:
+        """Return the unified user audience when configured, otherwise fall back."""
+        return self.auth0_user_audience or self.auth0_audience
+
+    @property
+    def auth0_audience_candidates(self) -> list[str]:
+        """Return all configured audience values in precedence order."""
+        candidates: list[str] = []
+        for value in (self.auth0_user_audience, self.auth0_audience):
+            if value and value not in candidates:
+                candidates.append(value)
+        return candidates
 
     # Ruleset Publishing Configuration
     # The environment name for published artifacts (e.g., 'local', 'test', 'prod')
