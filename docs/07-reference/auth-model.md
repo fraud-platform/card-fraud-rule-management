@@ -62,7 +62,7 @@ This document defines the authoritative authentication and authorization model f
 | Client Name                      | Type    | Doppler Key / Notes                                   | Purpose                                              |
 | -------------------------------- | ------- | ----------------------------------------------------- | ---------------------------------------------------- |
 | Fraud Intelligence Portal        | SPA     | `VITE_AUTH0_CLIENT_ID` (portal project)               | Browser login (PKCE)                                 |
-| Local Test Client                | M2M     | `E2E_AUTH0_CLIENT_ID` / `AUTH0_TEST_CLIENT_ID`        | E2E password-realm tests                             |
+| Local Test Client                | Confidential test client | `AUTH0_TEST_CLIENT_ID` + `AUTH0_TEST_CLIENT_SECRET` (portal aliases: `E2E_AUTH0_CLIENT_ID` + `E2E_AUTH0_CLIENT_SECRET`) | Local E2E/password-realm tests only |
 | Auth0 Management Automation      | M2M     | `AUTH0_MGMT_CLIENT_ID` (all backend projects)         | Management API automation                            |
 | Fraud Rule Management M2M        | M2M     | `AUTH0_CLIENT_ID` (rule-management project)           | Rule management service-to-service                   |
 | Fraud Transaction Management M2M | M2M     | `AUTH0_CLIENT_ID` (transaction-management project)    | Transaction management service-to-service            |
@@ -394,33 +394,17 @@ TEST_USERS = [
 
 ### 10.4 Using Test Users in Playwright
 
-```typescript
-// playwright/auth.setup.ts
-import { test as setup } from "@playwright/test";
+Do not perform a browser login for every test. The portal's authenticated
+fixtures and this service's `/api/v1/test-user-token` helper use the canonical
+role users and reuse one password-realm token per Playwright worker or service
+process. Use the browser SPA client only for a deliberately scoped UI-auth
+smoke test. The Local Test Client secret and all role passwords remain in
+Doppler.
 
-const testUsers = {
-  ruleMaker: {
-    email: process.env.TEST_USER_RULE_MAKER_EMAIL,
-    password: process.env.TEST_USER_RULE_MAKER_PASSWORD,
-  },
-  ruleChecker: {
-    email: process.env.TEST_USER_RULE_CHECKER_EMAIL,
-    password: process.env.TEST_USER_RULE_CHECKER_PASSWORD,
-  },
-  // ... etc
-};
-
-setup("authenticate as rule maker", async ({ page }) => {
-  await page.goto("/login");
-  await page.fill('[name="email"]', testUsers.ruleMaker.email);
-  await page.fill('[name="password"]', testUsers.ruleMaker.password);
-  await page.click('[type="submit"]');
-  await page.waitForURL("/dashboard");
-
-  // Save auth state
-  await page.context().storageState({ path: ".auth/rule-maker.json" });
-});
-```
+For manual service testing, call `/api/v1/test-user-token?user=maker` or
+`?user=checker` once, authorize Swagger with the returned token, and reuse it
+until near expiry. Do not put bearer tokens in source, logs, or committed
+storage-state files.
 
 ---
 

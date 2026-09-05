@@ -2,7 +2,7 @@
 
 > **Single source of truth** for Auth0 configuration across all projects.
 
-**Last Updated:** 2026-01-18
+**Last Updated:** 2026-09-04
 
 ---
 
@@ -116,6 +116,33 @@ After running bootstrap, enable RBAC for each API:
      - Enable "Add Permissions in the Access Token"
    - Save
    ```
+
+### 2.5 Local Test Client and Role Users
+
+Local role-specific tests use a separate confidential Auth0 application named
+`Local Test Client`. It is not the browser SPA client and it is not a service
+M2M client. Configure it once in the development tenant with:
+
+- `Password`, `Password Realm`, and `Client Credentials` grants
+- `Client Secret (Post)` authentication
+- `Username-Password-Authentication` enabled
+- the unified audience `https://fraud-governance-api` authorized
+
+Store its client ID and secret only in Doppler as
+`AUTH0_TEST_CLIENT_ID` and `AUTH0_TEST_CLIENT_SECRET`. The canonical role
+users are `test-rule-maker`, `test-rule-checker`, `test-platform-admin`,
+`test-fraud-analyst`, and `test-fraud-supervisor`; their passwords use the
+matching `TEST_USER_*_PASSWORD` Doppler keys.
+
+Keep **Suspicious IP Throttling** and **Brute-force Protection** enabled in the
+development tenant. If local testing is blocked, add the current egress IP to
+both protection allowlists. Do not disable the protections or create a new
+user for each test run.
+
+The local `/api/v1/test-user-token` helper obtains one password-realm token per
+role and reuses it until it is near expiry. Playwright and load-test code must
+reuse the same model; a fresh Auth0 login per test can trigger tenant attack
+protection.
 
 ---
 

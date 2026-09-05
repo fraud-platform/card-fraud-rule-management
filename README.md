@@ -10,6 +10,9 @@ This project uses **Doppler** for secrets.
 - Do not run `uv run test` / `uv run dev` directly.
 - Use Doppler wrappers only.
 - Auth0 setup is centralized here: `AUTH0_AUDIENCE` is the service audience, and `AUTH0_USER_AUDIENCE` is the shared user audience for the portal.
+- Role-specific local testing uses the separate `Local Test Client` through `AUTH0_TEST_CLIENT_ID` and `AUTH0_TEST_CLIENT_SECRET` in Doppler only.
+- `/api/v1/test-user-token` reuses one short-lived token per role and process; it must not be called as a per-test Auth0 login loop.
+- Keep Auth0 attack protection enabled. Add the local egress IP to the Suspicious IP Throttling and Brute-force Protection allowlists instead of disabling protection.
 
 ## Quick Start (PowerShell)
 

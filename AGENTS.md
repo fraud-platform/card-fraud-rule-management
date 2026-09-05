@@ -11,6 +11,7 @@ If another instruction file conflicts with this one, follow **AGENTS.md**.
 - Secrets: Doppler-only workflows. Do not create or commit `.env` files.
 - Commands: use repository wrappers from `pyproject.toml` or `package.json`; avoid ad-hoc commands.
 - Git hooks: run `git config core.hooksPath .githooks` after clone to enable pre-push guards.
+- Git workflow: work only on local `main`; do not create branches or linked worktrees. Push only `origin/main`. The pre-push guard covers Codex and Claude sessions; agents require `CARD_FRAUD_ALLOW_GIT_PUSH=1` for an explicitly requested push.
 - Docs publishing: keep only curated docs in `docs/01-setup` through `docs/07-reference`, plus `docs/README.md` and `docs/codemap.md`.
 - Docs naming: use lowercase kebab-case for docs files. Exceptions: `README.md`, `codemap.md`, and generated contract files.
 - Never commit docs/planning artifacts named `todo`, `status`, `archive`, or session notes.
@@ -114,6 +115,9 @@ Auth0 reference docs:
 Auth0 audience ownership:
 - `AUTH0_AUDIENCE` is the service audience for this backend.
 - `AUTH0_USER_AUDIENCE` is the shared human-user audience used by the portal and role namespace.
+- `AUTH0_TEST_CLIENT_ID` and `AUTH0_TEST_CLIENT_SECRET` belong only to the confidential `Local Test Client` used by local role-specific test helpers; keep both in Doppler.
+- The `/test-user-token` helper uses the canonical role users and caches one password-realm token per role in the running process. Do not add a password-grant request inside each test or load-test task.
+- Keep Suspicious IP Throttling and Brute-force Protection enabled; allowlist the current local egress IP when necessary for a development tenant.
 - `uv run auth0-bootstrap --yes --verbose` also deploys the shared credentials-exchange Action that mirrors issued M2M access-token scopes into `permissions`.
 
 ---

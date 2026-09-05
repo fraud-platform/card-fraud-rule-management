@@ -1,9 +1,10 @@
-"""Unit tests for test_utils endpoint.
+"""Unit tests for test_utils endpoints.
 
 Tests the /test-token endpoint which generates real Auth0 tokens for local development.
 Coverage targets: 80%+ for app/api/routes/test_utils.py
 """
 
+import os
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import httpx
@@ -163,7 +164,7 @@ class TestGenerateTestToken:
             data = response.json()
             assert "access_token" in data
             assert data["token_type"] == "Bearer"
-            assert data["expires_in"] == 3600
+            assert 0 < data["expires_in"] <= 3600
             assert "issued_at" in data
             assert "usage" in data
             assert "swagger_ui" in data["usage"]
@@ -295,8 +296,8 @@ class TestGenerateTestToken:
 
     @patch("app.api.routes.test_utils.httpx.AsyncClient")
     @pytest.mark.anyio
-    async def test_token_preview_logging_redacts_jwt(self, mock_httpx_client_class, caplog):
-        """Test that token preview in logs only shows first 20 characters."""
+    async def test_token_is_never_written_to_logs(self, mock_httpx_client_class, caplog):
+        """Test that the bearer token is never written to application logs."""
         # Mock Auth0 response with a long token
         long_token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." * 10 + "signature"
         mock_response = Mock()
@@ -332,19 +333,16 @@ class TestGenerateTestToken:
 
             assert response.status_code == 200
 
-            # Check that a log entry contains redacted token preview
+            # The log may confirm generation, but must not contain any token material.
             log_messages = [record.message for record in caplog.records]
             token_log = [msg for msg in log_messages if "Generated M2M test token" in msg]
             assert len(token_log) > 0
-            # Verify token is redacted (only shows first 20 chars + ...)
-            assert "..." in token_log[0]
-            # Full token should NOT appear in logs
-            assert long_token not in token_log[0]
+            assert all(long_token not in message for message in log_messages)
 
     @patch("app.api.routes.test_utils.httpx.AsyncClient")
     @pytest.mark.anyio
-    async def test_short_token_not_redacted_in_logs(self, mock_httpx_client_class, caplog):
-        """Test that very short tokens are fully redacted in logs."""
+    async def test_short_token_is_never_written_to_logs(self, mock_httpx_client_class, caplog):
+        """Test that even short tokens are never written to application logs."""
         # Mock Auth0 response with a short token (< 20 chars)
         short_token = "short.token.here"
         mock_response = Mock()
@@ -380,13 +378,11 @@ class TestGenerateTestToken:
 
             assert response.status_code == 200
 
-            # Check that short tokens are redacted as "***"
+            # No bearer token, including a short one, may be present in logs.
             log_messages = [record.message for record in caplog.records]
             token_log = [msg for msg in log_messages if "Generated M2M test token" in msg]
             assert len(token_log) > 0
-            assert "***" in token_log[0]
-            # Short token should NOT appear in logs
-            assert short_token not in token_log[0]
+            assert all(short_token not in message for message in log_messages)
 
     @patch("app.api.routes.test_utils.httpx.AsyncClient")
     @pytest.mark.anyio
@@ -438,6 +434,13 @@ class TestGenerateTestToken:
             assert payload["audience"] == audience
             assert payload["grant_type"] == "client_credentials"
 
+            # A second request must reuse the process-local token instead of
+            # generating another Auth0 login attempt.
+            second_response = client.get("/api/v1/test-token")
+            assert second_response.status_code == 200
+            assert second_response.json()["access_token"] == "test-access-token"
+            mock_client_instance.post.assert_awaited_once()
+
     @patch("app.api.routes.test_utils.httpx.AsyncClient")
     @pytest.mark.anyio
     async def test_returns_default_values_when_auth0_omits_fields(self, mock_httpx_client_class):
@@ -477,7 +480,7 @@ class TestGenerateTestToken:
             assert data["access_token"] == "minimal-token"
             # Should use defaults from .get() calls
             assert data["token_type"] == "Bearer"
-            assert data["expires_in"] == 86400
+            assert 0 < data["expires_in"] <= 86400
             assert "issued_at" in data
 
     @pytest.mark.anyio
@@ -597,3 +600,61 @@ class TestGenerateTestToken:
                 assert data["message"]["error"] == "Authentication service unavailable"
             else:
                 assert "Authentication service unavailable" in str(data)
+
+
+class TestGenerateTestUserToken:
+    """Test suite for the role-specific Auth0 token endpoint."""
+
+    @patch("app.api.routes.test_utils.httpx.AsyncClient")
+    @pytest.mark.anyio
+    async def test_reuses_role_token_within_application_process(self, mock_httpx_client_class):
+        """Repeated requests for a role must not repeat the password grant."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "access_token": "maker-access-token",
+            "token_type": "Bearer",
+            "expires_in": 3600,
+        }
+        mock_response.raise_for_status = Mock()
+
+        mock_client_instance = MagicMock()
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=False)
+        mock_client_instance.post = AsyncMock(return_value=mock_response)
+        mock_httpx_client_class.return_value = mock_client_instance
+
+        env = {
+            "AUTH0_TEST_CLIENT_ID": "local-test-client",
+            "AUTH0_TEST_CLIENT_SECRET": "local-test-secret",
+            "TEST_USER_RULE_MAKER_PASSWORD": "maker-password",
+        }
+        with (
+            patch("app.api.routes.test_utils.settings") as mock_settings,
+            patch.dict(os.environ, env, clear=False),
+        ):
+            mock_settings.app_env = "local"
+            mock_settings.auth0_domain = "test.auth0.com"
+            mock_settings.auth0_user_audience_resolved = "https://fraud-governance-api"
+            mock_settings.auth0_test_client_id = None
+            mock_settings.auth0_test_client_secret = None
+
+            from app.main import create_app
+
+            app = create_app()
+            client = TestClient(app)
+
+            first_response = client.get("/api/v1/test-user-token?user=maker")
+            second_response = client.get("/api/v1/test-user-token?user=maker")
+
+            assert first_response.status_code == 200
+            assert second_response.status_code == 200
+            assert first_response.json()["access_token"] == "maker-access-token"
+            assert second_response.json()["access_token"] == "maker-access-token"
+            mock_client_instance.post.assert_awaited_once()
+
+            payload = mock_client_instance.post.call_args.kwargs["json"]
+            assert payload["client_id"] == "local-test-client"
+            assert payload["client_secret"] == "local-test-secret"
+            assert payload["grant_type"] == "http://auth0.com/oauth/grant-type/password-realm"
+            assert payload["realm"] == "Username-Password-Authentication"

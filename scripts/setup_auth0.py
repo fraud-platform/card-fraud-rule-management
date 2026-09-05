@@ -164,7 +164,9 @@ OPS_ANALYST_PERMISSIONS: list[dict[str, str]] = [
 ]
 
 # Use all permissions for the unified API
-DEFAULT_SCOPES = RULE_MANAGEMENT_PERMISSIONS + TRANSACTION_MANAGEMENT_PERMISSIONS + OPS_ANALYST_PERMISSIONS
+DEFAULT_SCOPES = (
+    RULE_MANAGEMENT_PERMISSIONS + TRANSACTION_MANAGEMENT_PERMISSIONS + OPS_ANALYST_PERMISSIONS
+)
 
 # =============================================================================
 # ROLES - As defined in AUTH_MODEL.md
@@ -256,15 +258,32 @@ ROLE_PERMISSIONS = {
     ],
     # Fraud operations: transaction + ops_agent + read-only rule access
     "FRAUD_ANALYST": [
-        "txn:view", "txn:comment", "txn:flag", "txn:recommend",
-        "ops_agent:read", "ops_agent:run", "ops_agent:ack",
-        "rule:read", "ruleset:read", "rule_field:read",
+        "txn:view",
+        "txn:comment",
+        "txn:flag",
+        "txn:recommend",
+        "ops_agent:read",
+        "ops_agent:run",
+        "ops_agent:ack",
+        "rule:read",
+        "ruleset:read",
+        "rule_field:read",
     ],
     "FRAUD_SUPERVISOR": [
-        "txn:view", "txn:comment", "txn:flag", "txn:recommend",
-        "txn:approve", "txn:block", "txn:override",
-        "ops_agent:read", "ops_agent:run", "ops_agent:ack", "ops_agent:draft",
-        "rule:read", "ruleset:read", "rule_field:read",
+        "txn:view",
+        "txn:comment",
+        "txn:flag",
+        "txn:recommend",
+        "txn:approve",
+        "txn:block",
+        "txn:override",
+        "ops_agent:read",
+        "ops_agent:run",
+        "ops_agent:ack",
+        "ops_agent:draft",
+        "rule:read",
+        "ruleset:read",
+        "rule_field:read",
     ],
 }
 
@@ -618,7 +637,9 @@ class Auth0Mgmt:
             },
         )
 
-    def update_user_password(self, *, user_id: str, password: str, connection: str = "Username-Password-Authentication") -> dict:
+    def update_user_password(
+        self, *, user_id: str, password: str, connection: str = "Username-Password-Authentication"
+    ) -> dict:
         """Update an existing user's password via the Management API."""
         return self._request(
             "PATCH",

@@ -318,7 +318,10 @@ class Auth0Verifier:
     def verify_trigger_bindings(self) -> VerificationResult:
         """Check if actions are bound to correct triggers."""
         try:
-            triggers_to_check = {"post-login": "Add Roles to Token", "credentials-exchange": "Normalize M2M Permissions"}
+            triggers_to_check = {
+                "post-login": "Add Roles to Token",
+                "credentials-exchange": "Normalize M2M Permissions",
+            }
             bound_triggers = []
 
             for trigger, expected_action in triggers_to_check.items():

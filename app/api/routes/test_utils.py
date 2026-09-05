@@ -17,10 +17,12 @@ To test maker-checker workflows:
 
 import logging
 import os
+import time
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app.core.config import settings
 
@@ -28,9 +30,69 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["test-utils"])
 
+_TOKEN_REFRESH_SKEW_SECONDS = 60
+
+
+@dataclass(frozen=True)
+class _CachedAuth0Token:
+    """Short-lived in-memory Auth0 token cache entry for local test helpers."""
+
+    access_token: str
+    token_type: str
+    expires_at: float
+    issued_at: str
+
+
+def _token_cache(request: Request) -> dict[tuple[str, ...], _CachedAuth0Token]:
+    """Return the cache scoped to this application process."""
+    cache = getattr(request.app.state, "auth0_test_token_cache", None)
+    if cache is None:
+        cache = {}
+        request.app.state.auth0_test_token_cache = cache
+    return cache
+
+
+def _get_cached_token(request: Request, key: tuple[str, ...]) -> _CachedAuth0Token | None:
+    cache = _token_cache(request)
+    entry = cache.get(key)
+    if entry is None:
+        return None
+    if time.monotonic() + _TOKEN_REFRESH_SKEW_SECONDS >= entry.expires_at:
+        cache.pop(key, None)
+        return None
+    return entry
+
+
+def _cache_token(
+    request: Request,
+    key: tuple[str, ...],
+    *,
+    access_token: str,
+    token_type: str,
+    expires_in: int,
+) -> _CachedAuth0Token:
+    entry = _CachedAuth0Token(
+        access_token=access_token,
+        token_type=token_type,
+        expires_at=time.monotonic() + expires_in,
+        issued_at=datetime.now(UTC).isoformat(),
+    )
+    _token_cache(request)[key] = entry
+    return entry
+
+
+def _cached_token_response(entry: _CachedAuth0Token) -> dict[str, object]:
+    """Serialize a cached token without exposing internal cache timestamps."""
+    return {
+        "access_token": entry.access_token,
+        "token_type": entry.token_type,
+        "expires_in": max(1, int(entry.expires_at - time.monotonic())),
+        "issued_at": entry.issued_at,
+    }
+
 
 @router.get("/test-token")
-async def generate_test_token() -> dict:
+async def generate_test_token(request: Request) -> dict:
     """
     Generate a real Auth0 M2M token for local development testing.
 
@@ -104,24 +166,45 @@ async def generate_test_token() -> dict:
         "audience": settings.auth0_audience,
         "grant_type": "client_credentials",
     }
+    cache_key = ("m2m", settings.auth0_domain, client_id, settings.auth0_audience)
 
     try:
+        cached = _get_cached_token(request, cache_key)
+        if cached is not None:
+            token_data = _cached_token_response(cached)
+            return {
+                **token_data,
+                "token_category": "M2M (Client Credentials)",
+                "limitations": [
+                    "Token represents client, not user",
+                    "maker=checker validation will REJECT approval requests",
+                    "For maker-checker testing, use /test-user-token endpoint",
+                ],
+                "usage": {
+                    "swagger_ui": "Click 'Authorize' button, paste token, click 'Authorize'",
+                    "curl_example": 'curl -H "Authorization: Bearer <access-token>" http://127.0.0.1:8000/api/v1/rule-fields',
+                },
+            }
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(token_url, json=payload)
             response.raise_for_status()
-            token_data = response.json()
+            auth0_data = response.json()
 
-        access_token = token_data["access_token"]
-
-        # Log only token prefix for security - full token should not appear in logs
-        token_preview = f"{access_token[:20]}..." if len(access_token) > 20 else "***"
-        logger.info(f"Generated M2M test token (preview: {token_preview})")
+        access_token = auth0_data["access_token"]
+        expires_in = int(auth0_data.get("expires_in", 86400))
+        entry = _cache_token(
+            request,
+            cache_key,
+            access_token=access_token,
+            token_type=auth0_data.get("token_type", "Bearer"),
+            expires_in=expires_in,
+        )
+        token_data = _cached_token_response(entry)
+        logger.info("Generated M2M test token for the configured local test helper")
 
         return {
-            "access_token": access_token,
-            "token_type": token_data.get("token_type", "Bearer"),
-            "expires_in": token_data.get("expires_in", 86400),
-            "issued_at": datetime.now(UTC).isoformat(),
+            **token_data,
             "token_category": "M2M (Client Credentials)",
             "limitations": [
                 "Token represents client, not user",
@@ -130,7 +213,7 @@ async def generate_test_token() -> dict:
             ],
             "usage": {
                 "swagger_ui": "Click 'Authorize' button, paste token, click 'Authorize'",
-                "curl_example": f'curl -H "Authorization: Bearer {access_token[:20]}..." http://127.0.0.1:8000/api/v1/rule-fields',
+                "curl_example": 'curl -H "Authorization: Bearer <access-token>" http://127.0.0.1:8000/api/v1/rule-fields',
             },
         }
 
@@ -155,6 +238,7 @@ async def generate_test_token() -> dict:
 
 @router.get("/test-user-token")
 async def generate_test_user_token(
+    request: Request,
     user: str = Query(
         default="maker",
         description="User type: 'maker', 'checker', or 'admin'",
@@ -307,22 +391,50 @@ async def generate_test_user_token(
         "realm": "Username-Password-Authentication",
         "scope": "openid profile email",
     }
+    cache_key = (
+        "user",
+        settings.auth0_domain,
+        test_client_id,
+        settings.auth0_user_audience_resolved,
+        config["email"],
+    )
 
     try:
+        cached = _get_cached_token(request, cache_key)
+        if cached is not None:
+            token_data = _cached_token_response(cached)
+            return {
+                **token_data,
+                "token_category": "User Token (Password Grant)",
+                "user_type": user,
+                "user_email": config["email"],
+                "roles": [config["description"]],
+                "maker_checker_compatible": True,
+                "usage": {
+                    "swagger_ui": f"Authorize with this token, then test {user} operations",
+                    "curl_example": 'curl -H "Authorization: Bearer <access-token>" http://127.0.0.1:8000/api/v1/rule-fields',
+                },
+            }
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(token_url, json=payload)
             response.raise_for_status()
-            token_data = response.json()
+            auth0_data = response.json()
 
-        access_token = token_data["access_token"]
-        token_preview = f"{access_token[:20]}..." if len(access_token) > 20 else "***"
-        logger.info(f"Generated test user token for {user} (preview: {token_preview})")
+        access_token = auth0_data["access_token"]
+        expires_in = int(auth0_data.get("expires_in", 86400))
+        entry = _cache_token(
+            request,
+            cache_key,
+            access_token=access_token,
+            token_type=auth0_data.get("token_type", "Bearer"),
+            expires_in=expires_in,
+        )
+        token_data = _cached_token_response(entry)
+        logger.info("Generated user test token for role %s", user)
 
         return {
-            "access_token": access_token,
-            "token_type": token_data.get("token_type", "Bearer"),
-            "expires_in": token_data.get("expires_in", 86400),
-            "issued_at": datetime.now(UTC).isoformat(),
+            **token_data,
             "token_category": "User Token (Password Grant)",
             "user_type": user,
             "user_email": config["email"],
@@ -330,7 +442,7 @@ async def generate_test_user_token(
             "maker_checker_compatible": True,
             "usage": {
                 "swagger_ui": f"Authorize with this token, then test {user} operations",
-                "curl_example": f'curl -H "Authorization: Bearer {access_token[:20]}..." http://127.0.0.1:8000/api/v1/rule-fields',
+                "curl_example": 'curl -H "Authorization: Bearer <access-token>" http://127.0.0.1:8000/api/v1/rule-fields',
             },
         }
 

@@ -555,6 +555,7 @@ def fetch_auth0_user_token(
     payload = {
         "grant_type": "http://auth0.com/oauth/grant-type/password-realm",
         "client_id": client_id,
+        "client_secret": client_secret,
         "username": username,
         "password": password,
         "audience": audience,
@@ -620,8 +621,12 @@ def initialize_auth_tokens(config: TestConfig) -> dict[str, str | None]:
         "AUTH0_CLIENT_SECRET", ""
     )
 
-    test_client_id = os.environ.get("AUTH0_TEST_CLIENT_ID", "")
-    test_client_secret = os.environ.get("AUTH0_TEST_CLIENT_SECRET", "")
+    test_client_id = get_doppler_secret("AUTH0_TEST_CLIENT_ID") or os.environ.get(
+        "AUTH0_TEST_CLIENT_ID", ""
+    )
+    test_client_secret = get_doppler_secret("AUTH0_TEST_CLIENT_SECRET") or os.environ.get(
+        "AUTH0_TEST_CLIENT_SECRET", ""
+    )
 
     maker_password = get_doppler_secret("TEST_USER_RULE_MAKER_PASSWORD") or ""
     checker_password = get_doppler_secret("TEST_USER_RULE_CHECKER_PASSWORD") or ""

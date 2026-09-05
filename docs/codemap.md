@@ -4,6 +4,7 @@
 
 FastAPI control-plane service for rule authoring, approvals, and artifact publishing.
 Auth0 setup is centralized in this repo, with `AUTH0_USER_AUDIENCE` shared across the portal and backend services.
+Local role-test tokens come from the separate confidential `Local Test Client`; the `/test-user-token` helper caches one password-realm token per role/process and reads its ID, secret, and user passwords from Doppler.
 This repo's Auth0 bootstrap also deploys the shared credentials-exchange Action that mirrors issued M2M access-token scopes into permissions.
 Backend permission helpers treat `PLATFORM_ADMIN` as an allow-all bypass for defense in depth.
 The auth boundary now returns typed `AuthenticatedUser` objects instead of raw JWT dicts.

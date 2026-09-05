@@ -50,6 +50,7 @@ if _explicit_env_file:
 
 import httpx  # noqa: E402 (import after path setup)
 import pytest  # noqa: E402 (import after path setup)
+import pytest_asyncio  # noqa: E402 (import after path setup)
 from fastapi.testclient import TestClient  # noqa: E402 (import after path setup)
 from sqlalchemy import create_engine, text  # noqa: E402 (import after path setup)
 from sqlalchemy.engine import Engine  # noqa: E402 (import after path setup)
@@ -447,7 +448,7 @@ def clean_db_session(test_engine: Engine) -> Generator[Session]:
 # ============================================================================
 
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def reset_async_engine_before_test():
     """Reset async database engine before each test for fresh connections.
 
@@ -566,8 +567,8 @@ async def clean_async_db_session(async_engine: AsyncEngine) -> AsyncGenerator[As
             await session.rollback()
             for table in reversed(Base.metadata.sorted_tables):
                 schema = table.schema or "fraud_gov"
-                await session.execute(text(f'DELETE FROM "{schema}"."{table.name}"'))
-            await session.commit()
+                await connection.execute(text(f'DELETE FROM "{schema}"."{table.name}"'))
+            await connection.commit()
             await session.close()
 
 
