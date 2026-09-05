@@ -82,6 +82,42 @@ uv run doppler-prod      # Tests against Neon 'prod' branch
 - Matches production exactly
 - Required for CI/CD
 
+### Which Database Should Local Testing Use?
+
+Use the local Docker PostgreSQL instance for day-to-day development and local
+tests:
+
+```powershell
+uv run doppler-local-test
+```
+
+This uses the shared `card-fraud-postgres` container on `localhost:5432`. Use
+the Neon test branch only when you explicitly need remote/shared integration
+coverage:
+
+```powershell
+uv run doppler-test
+```
+
+After moving to a new laptop, do not copy a Postgres data volume. Recreate the
+local schema and seed data from source control. If the shared platform
+container already exists, align local Doppler secrets first, then initialize
+this service:
+
+```powershell
+cd ..\card-fraud-platform
+uv run platform-sync-secrets --source-project card-fraud-platform
+cd ..\card-fraud-rule-management
+uv run db-init
+```
+
+The equivalent Neon bootstrap is `uv run db-init-test`.
+
+The runtime database user is intentionally granted CRUD access, not
+`TRUNCATE`. Test cleanup therefore uses `DELETE`; a `permission denied for
+table approvals` message from a test fixture indicates an outdated fixture or
+database setup, not a permission that should be granted to the application.
+
 ### Database Design
 
 This system stores **rules as structured configuration objects**, not relational columns:

@@ -75,8 +75,9 @@ class TestAppCreation:
     async def test_create_app_registers_routers(self):
         app = create_app()
 
-        # Check that routers are registered
-        routes = [route.path for route in app.routes]
+        # Check that routers are registered through the public OpenAPI route
+        # map; Starlette may include internal router entries without `.path`.
+        routes = set(app.openapi()["paths"])
         assert "/api/v1/health" in routes
         assert "/api/v1/rule-fields" in routes
         assert "/api/v1/rules" in routes

@@ -522,35 +522,23 @@ async def clean_async_db_session(async_engine: AsyncEngine) -> AsyncGenerator[As
     Provide an async database session that commits changes.
 
     Uses a FRESH connection (dispose old ones) to ensure isolation from
-    previous tests that may have committed data. Tables are truncated
-    BEFORE and AFTER the test to ensure clean state.
+    previous tests that may have committed data. Tables are cleared with
+    DELETE BEFORE and AFTER the test to avoid requiring TRUNCATE privilege.
 
     Use this for complex test flows requiring real commits.
     """
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     # Dispose any existing pooled connections to ensure fresh connection
     await async_engine.dispose()
 
     async with async_engine.connect() as connection:
         await connection.execute(text("SET search_path TO fraud_gov, public"))
 
-        # Truncate ALL tables BEFORE the test to ensure clean state
-        # This handles cases where previous tests committed data
-        for table in Base.metadata.sorted_tables:
+        # Delete ALL rows BEFORE the test to ensure clean state. The runtime
+        # role intentionally has CRUD access but not TRUNCATE privilege.
+        for table in reversed(Base.metadata.sorted_tables):
             schema = table.schema or "fraud_gov"
-            try:
-                await connection.execute(text(f'TRUNCATE TABLE "{schema}"."{table.name}" CASCADE'))
-            except Exception as e:
-                logger.warning(f"Failed to truncate {schema}.{table.name}: {e}")
-
-        try:
-            await connection.commit()
-        except Exception as e:
-            logger.warning(f"Failed to commit truncation: {e}")
-            await connection.rollback()
+            await connection.execute(text(f'DELETE FROM "{schema}"."{table.name}"'))
+        await connection.commit()
 
         session_maker = async_sessionmaker(
             bind=connection,
@@ -563,7 +551,7 @@ async def clean_async_db_session(async_engine: AsyncEngine) -> AsyncGenerator[As
         try:
             yield session
         finally:
-            # Clean up all test data AFTER the test
+            # Clean up all test data AFTER the test using CRUD privileges.
             await session.rollback()
             for table in reversed(Base.metadata.sorted_tables):
                 schema = table.schema or "fraud_gov"

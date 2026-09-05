@@ -169,7 +169,13 @@ class RuleFieldVersion(Base):
     multi_value_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status: Mapped[str] = mapped_column(
-        Enum(EntityStatus, create_constraint=True, name="entity_status"), nullable=False
+        Enum(
+            EntityStatus,
+            create_constraint=True,
+            name="entity_status",
+            schema="fraud_gov",
+        ),
+        nullable=False,
     )
     created_by: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -212,11 +218,18 @@ class Rule(Base):
     rule_name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     rule_type: Mapped[str] = mapped_column(
-        Enum(RuleType, create_constraint=True, name="rule_type"), nullable=False
+        Enum(RuleType, create_constraint=True, name="rule_type", schema="fraud_gov"),
+        nullable=False,
     )
     current_version: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(
-        Enum(EntityStatus, create_constraint=True, name="entity_status"), nullable=False
+        Enum(
+            EntityStatus,
+            create_constraint=True,
+            name="entity_status",
+            schema="fraud_gov",
+        ),
+        nullable=False,
     )
     version: Mapped[int] = mapped_column(
         Integer,
@@ -312,7 +325,13 @@ class RuleVersion(Base):
     approved_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     approved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(
-        Enum(EntityStatus, create_constraint=True, name="entity_status"), nullable=False
+        Enum(
+            EntityStatus,
+            create_constraint=True,
+            name="entity_status",
+            schema="fraud_gov",
+        ),
+        nullable=False,
     )
 
     # Relationships
@@ -357,7 +376,8 @@ class RuleSet(Base):
     region: Mapped[str] = mapped_column(Text, nullable=False)
     country: Mapped[str] = mapped_column(Text, nullable=False)
     rule_type: Mapped[str] = mapped_column(
-        Enum(RuleType, create_constraint=True, name="rule_type"), nullable=False
+        Enum(RuleType, create_constraint=True, name="rule_type", schema="fraud_gov"),
+        nullable=False,
     )
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -434,7 +454,13 @@ class RuleSetVersion(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
-        Enum(EntityStatus, create_constraint=True, name="entity_status"), nullable=False
+        Enum(
+            EntityStatus,
+            create_constraint=True,
+            name="entity_status",
+            schema="fraud_gov",
+        ),
+        nullable=False,
     )
     created_by: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -522,7 +548,12 @@ class Approval(Base):
         UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid7())
     )
     entity_type: Mapped[str] = mapped_column(
-        Enum(ApprovalEntityType, create_constraint=True, name="approval_entity_type"),
+        Enum(
+            ApprovalEntityType,
+            create_constraint=True,
+            name="approval_entity_type",
+            schema="fraud_gov",
+        ),
         nullable=False,
     )
     entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=False), nullable=False)
@@ -530,7 +561,13 @@ class Approval(Base):
     maker: Mapped[str] = mapped_column(Text, nullable=False)
     checker: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
-        Enum(ApprovalStatus, create_constraint=True, name="approval_status"), nullable=False
+        Enum(
+            ApprovalStatus,
+            create_constraint=True,
+            name="approval_status",
+            schema="fraud_gov",
+        ),
+        nullable=False,
     )
     remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
     idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -560,7 +597,13 @@ class AuditLog(Base):
     # Use Uuid type for psycopg v3 compatibility (stores as string)
     audit_id: Mapped[str] = mapped_column(Uuid, primary_key=True, default=lambda: str(uuid.uuid7()))
     entity_type: Mapped[str] = mapped_column(
-        Enum(AuditEntityType, create_constraint=True, name="audit_entity_type"), nullable=False
+        Enum(
+            AuditEntityType,
+            create_constraint=True,
+            name="audit_entity_type",
+            schema="fraud_gov",
+        ),
+        nullable=False,
     )
     entity_id: Mapped[str] = mapped_column(Uuid, nullable=False)
     action: Mapped[str] = mapped_column(Text, nullable=False)
@@ -614,7 +657,8 @@ class RuleSetManifest(Base):
     region: Mapped[str] = mapped_column(Text, nullable=False)
     country: Mapped[str] = mapped_column(Text, nullable=False)
     rule_type: Mapped[str] = mapped_column(
-        Enum(RuleType, create_constraint=True, name="rule_type"), nullable=False
+        Enum(RuleType, create_constraint=True, name="rule_type", schema="fraud_gov"),
+        nullable=False,
     )
     ruleset_version: Mapped[int] = mapped_column(Integer, nullable=False)
     ruleset_version_id: Mapped[uuid.UUID] = mapped_column(
