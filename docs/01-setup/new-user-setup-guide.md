@@ -372,7 +372,7 @@ curl -H "Authorization: Bearer $token" http://localhost:8000/api/v1/rule-fields
 **Solution:**
 ```powershell
 # Make sure uv is in your PATH
-$env:Path = [System.IO.Directory]::GetFiles("C:\Users\$env:USERNAME\AppData\Local\Programs\uv", "*.exe", [System.IO.SearchOption]::AllDirectories) + $env:Path
+$env:Path = [System.IO.Directory]::GetFiles("$env:LOCALAPPDATA\Programs\uv", "*.exe", [System.IO.SearchOption]::AllDirectories) + $env:Path
 
 # Or restart your terminal
 ```

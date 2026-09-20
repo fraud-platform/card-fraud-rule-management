@@ -30,6 +30,7 @@ The auth boundary now returns typed `AuthenticatedUser` objects instead of raw J
 - `uv run db-reset-schema --yes --schema-reset-ack RESET_SHARED_SCHEMA`
 
 HTTP metrics labels are normalized to route templates to avoid high-cardinality labels.
+Prometheus scrapers may send the shared token as `X-Metrics-Token` or `Authorization: Bearer <METRICS_TOKEN>`.
 
 ## Platform Modes
 

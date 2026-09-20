@@ -22,11 +22,11 @@ router = APIRouter(tags=["Monitoring"])
 async def get_metrics(request: Request) -> Response:
     """Prometheus metrics endpoint for scraping.
 
-    SECURITY: Requires X-Metrics-Token header for authentication.
+    SECURITY: Requires X-Metrics-Token or Authorization: Bearer authentication.
     Exposes internal system metrics that could aid reconnaissance if leaked.
 
     Args:
-        request: The incoming request with X-Metrics-Token header
+        request: The incoming request with a metrics token header
 
     Returns:
         Prometheus metrics in text format
@@ -48,6 +48,10 @@ async def get_metrics(request: Request) -> Response:
 
     # Verify token using constant-time comparison to prevent timing attacks
     metrics_token = request.headers.get("X-Metrics-Token")
+    if not metrics_token:
+        authorization = request.headers.get("Authorization", "")
+        if authorization.lower().startswith("bearer "):
+            metrics_token = authorization[7:].strip()
     if not hmac.compare_digest(metrics_token or "", expected_token):
         logger.warning(
             "Unauthorized metrics access attempt",

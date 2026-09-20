@@ -49,6 +49,7 @@ uv run openapi
 - Swagger UI: `http://127.0.0.1:8000/docs`
 - OpenAPI spec: `docs/03-api/openapi.json` (generated)
 - Human API guide: `docs/03-api/reference.md`
+- Prometheus metrics: `GET /metrics` (requires `X-Metrics-Token` or `Authorization: Bearer <METRICS_TOKEN>`)
 - HTTP metrics labels are normalized to route templates to avoid high-cardinality time series.
 
 ## Documentation

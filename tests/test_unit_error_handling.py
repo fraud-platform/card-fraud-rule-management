@@ -88,7 +88,7 @@ class TestSanitizeErrorDetails:
     async def test_redacts_unix_style_file_paths(self):
         """Test that Unix file paths are redacted."""
         details = {
-            "location": "/home/user/app/main.py",
+            "location": "/app/main.py",
         }
 
         with patch("app.main.settings") as mock_settings:

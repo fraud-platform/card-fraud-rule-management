@@ -100,7 +100,7 @@ VALUES (
   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   1,
-  '{"field":"mcc","op":"IN","value":["5967","7995"]}'::jsonb,
+  '{"field":"merchant_category_code","op":"IN","value":["5967","7995"]}'::jsonb,
   50,
   'maker@system',
   'DRAFT'
@@ -113,11 +113,31 @@ ON CONFLICT (rule_version_id) DO NOTHING;
 
 INSERT INTO fraud_gov.rulesets (
   ruleset_id,
+  environment,
+  region,
+  country,
+  rule_type,
   name,
   description,
-  rule_type,
+  created_by
+)
+VALUES (
+  '33333333-3333-3333-3333-333333333333',
+  'local',
+  'APAC',
+  'IN',
+  'MONITORING',
+  'Monitoring Ruleset v1',
+  'Seeded ruleset for dev/testing',
+  'seed@system'
+)
+ON CONFLICT (ruleset_id) DO NOTHING;
+
+INSERT INTO fraud_gov.ruleset_versions (
+  ruleset_version_id,
+  ruleset_id,
   version,
-  compiled_ast,
+  description,
   status,
   created_by,
   approved_by,
@@ -125,38 +145,22 @@ INSERT INTO fraud_gov.rulesets (
   activated_at
 )
 VALUES (
+  '33333333-3333-3333-3333-333333333334',
   '33333333-3333-3333-3333-333333333333',
-  'Monitoring Ruleset v1',
-  'Seeded ruleset for dev/testing',
-  'MONITORING',
   1,
-  jsonb_build_object(
-    'rulesetId','33333333-3333-3333-3333-333333333333',
-    'version',1,
-    'ruleType','MONITORING',
-    'evaluation', jsonb_build_object('mode','ALL_MATCHING'),
-    'velocityFailurePolicy','SKIP',
-    'rules', jsonb_build_array(
-      jsonb_build_object(
-        'ruleId','11111111-1111-1111-1111-111111111111',
-        'priority',100,
-        'when', '{"field":"amount","op":"GT","value":3000}'::jsonb,
-        'action','FLAG'
-      )
-    )
-  ),
+  'Seeded ruleset snapshot for dev/testing',
   'ACTIVE',
   'seed@system',
   'checker@system',
   now(),
   now()
 )
-ON CONFLICT (ruleset_id) DO NOTHING;
+ON CONFLICT (ruleset_version_id) DO NOTHING;
 
-INSERT INTO fraud_gov.ruleset_rules (ruleset_id, rule_version_id)
+INSERT INTO fraud_gov.ruleset_version_rules (ruleset_version_id, rule_version_id)
 VALUES
-  ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222')
-ON CONFLICT (ruleset_id, rule_version_id) DO NOTHING;
+  ('33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222')
+ON CONFLICT (ruleset_version_id, rule_version_id) DO NOTHING;
 
 -- ------------------------------------------------------------
 -- Approvals
@@ -199,8 +203,8 @@ INSERT INTO fraud_gov.approvals (
 )
 VALUES (
   '55555555-5555-5555-5555-555555555555',
-  'RULESET',
-  '33333333-3333-3333-3333-333333333333',
+  'RULESET_VERSION',
+  '33333333-3333-3333-3333-333333333334',
   'APPROVE',
   'seed@system',
   'checker@system',
@@ -247,8 +251,8 @@ VALUES
   ),
   (
     '88888888-8888-8888-8888-888888888888',
-    'RULESET',
-    '33333333-3333-3333-3333-333333333333',
+    'RULESET_VERSION',
+    '33333333-3333-3333-3333-333333333334',
     'SEED_ACTIVATE',
     NULL,
     jsonb_build_object('status','ACTIVE'),

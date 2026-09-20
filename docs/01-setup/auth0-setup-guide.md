@@ -159,20 +159,27 @@ Before running bootstrap scripts:
 ### 3.2 Run Bootstrap
 
 ```powershell
+# Run from the parent directory that contains the sibling repositories.
 # Rule Management (creates all shared resources)
-cd C:\Users\kanna\github\card-fraud-rule-management
+Set-Location .\card-fraud-rule-management
 doppler setup --project card-fraud-rule-management --config local
 uv sync
 uv run auth0-bootstrap --yes --verbose
 
-# Rule Engine
-cd C:\Users\kanna\github\card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring
-doppler setup --project card-fraud-rule-engine-auth/card-fraud-rule-engine-monitoring --config local
+# Rule Engine Auth
+Set-Location ..\card-fraud-rule-engine-auth
+doppler setup --project card-fraud-rule-engine-auth --config local
+uv sync
+uv run auth0-bootstrap --yes --verbose
+
+# Rule Engine Monitoring
+Set-Location ..\card-fraud-rule-engine-monitoring
+doppler setup --project card-fraud-rule-engine-monitoring --config local
 uv sync
 uv run auth0-bootstrap --yes --verbose
 
 # Transaction Management
-cd C:\Users\kanna\github\card-fraud-transaction-management
+Set-Location ..\card-fraud-transaction-management
 doppler setup --project card-fraud-transaction-management --config local
 uv sync
 uv run auth0-bootstrap --yes --verbose
@@ -339,7 +346,6 @@ const { isRuleChecker, isPlatformAdmin } = useAuth();
 To start fresh (delete everything except Management M2M):
 
 ```powershell
-cd C:\Users\kanna\github\card-fraud-rule-management
 uv run auth0-cleanup --yes --verbose
 ```
 

@@ -19,14 +19,57 @@ class TestProtectedMetricsEndpoint:
     """Tests for the protected /metrics endpoint."""
 
     @pytest.mark.anyio
+    async def test_metrics_endpoint_accepts_bearer_token_for_prometheus(self):
+        """Prometheus bearer-token auth is equivalent to the legacy header."""
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from app.api.routes import monitoring
+
+        app = FastAPI()
+        app.include_router(monitoring.router)
+
+        with patch.object(monitoring, "settings") as mock_settings:
+            mock_settings.metrics_token = "metrics-test-token"
+            response = TestClient(app).get(
+                "/metrics",
+                headers={"Authorization": "Bearer metrics-test-token"},
+            )
+
+        assert response.status_code == 200
+        assert "text/plain" in response.headers["content-type"]
+
+    @pytest.mark.anyio
+    async def test_metrics_endpoint_rejects_invalid_bearer_token(self):
+        """A bearer token must match the configured metrics token exactly."""
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from app.api.routes import monitoring
+
+        app = FastAPI()
+        app.include_router(monitoring.router)
+
+        with patch.object(monitoring, "settings") as mock_settings:
+            mock_settings.metrics_token = "metrics-test-token"
+            response = TestClient(app).get(
+                "/metrics",
+                headers={"Authorization": "Bearer wrong-token"},
+            )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Invalid metrics token"
+
+    @pytest.mark.anyio
     async def test_metrics_endpoint_returns_500_without_token_config(self):
         """Test that /metrics returns 500 when METRICS_TOKEN is not configured."""
         from fastapi.testclient import TestClient
 
+        from app.api.routes import monitoring
         from app.main import create_app
 
         # Patch settings before creating the app
-        with patch("app.core.config.settings") as mock_settings:
+        with patch.object(monitoring, "settings") as mock_settings:
             mock_settings.metrics_token = None
             mock_settings.observability_enabled = True
 

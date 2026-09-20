@@ -681,7 +681,7 @@ class DatabaseSetup:
                 if demo:
                     log_info("Applying demo data...")
                     try:
-                        demo_sql = self._load_sql_file("seed_demo_data.sql")
+                        demo_sql = self._load_sql_file("seed_all_tables.sql")
                         demo_result = self._execute_sql(conn, demo_sql, "Demo data application")
                         results.append(demo_result)
                         if demo_result.success:
@@ -689,7 +689,7 @@ class DatabaseSetup:
                         else:
                             log_warning(f"{demo_result.message}: {demo_result.details}")
                     except FileNotFoundError:
-                        log_warning("seed_demo_data.sql not found, skipping")
+                        log_warning("seed_all_tables.sql not found, skipping")
 
         except psycopg.Error as e:
             log_error(f"Database connection failed: {type(e).__name__}: {e}")
@@ -838,14 +838,14 @@ class DatabaseSetup:
                 if demo:
                     log_info("Applying demo data...")
                     try:
-                        demo_sql = self._load_sql_file("seed_demo_data.sql")
+                        demo_sql = self._load_sql_file("seed_all_tables.sql")
                         result = self._execute_sql(conn, demo_sql, "Demo data application")
                         if result.success:
                             log_success(f"{result.message}: {result.details}")
                         else:
                             log_warning(f"{result.message}: {result.details}")
                     except FileNotFoundError:
-                        log_warning("seed_demo_data.sql not found, skipping")
+                        log_warning("seed_all_tables.sql not found, skipping")
 
         except psycopg.Error as e:
             log_error(f"Seed failed: {type(e).__name__}: {e}")

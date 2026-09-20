@@ -130,9 +130,10 @@ Auth0 audience ownership:
 4. Compiler output must be deterministic (same input => same bytes).
 5. Maker-checker invariant: maker cannot approve own submission.
 6. Authorization is permission-based (`require_permission(...)`).
-7. HTTP metrics route labels must use route templates (never raw request paths).
-8. `PLATFORM_ADMIN` must retain a defense-in-depth allow-all bypass in backend permission checks.
-9. The auth boundary returns typed `AuthenticatedUser` objects, not raw JWT dicts.
+7. Prometheus `GET /metrics` accepts the legacy `X-Metrics-Token` header and standard `Authorization: Bearer <METRICS_TOKEN>`; both use constant-time comparison.
+8. HTTP metrics route labels must use route templates (never raw request paths).
+9. `PLATFORM_ADMIN` must retain a defense-in-depth allow-all bypass in backend permission checks.
+10. The auth boundary returns typed `AuthenticatedUser` objects, not raw JWT dicts.
 
 Rule type -> evaluation mode mapping:
 - `ALLOWLIST` -> `FIRST_MATCH`

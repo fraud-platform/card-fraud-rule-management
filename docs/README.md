@@ -2,7 +2,7 @@
 
 FastAPI control-plane service for rule authoring, approvals, and artifact publishing.
 
-Observability note: HTTP metrics labels use normalized route templates (no raw path labels).
+Observability note: `GET /metrics` accepts `X-Metrics-Token` or `Authorization: Bearer <METRICS_TOKEN>`; HTTP metrics labels use normalized route templates (no raw path labels).
 Auth0 note: the shared portal audience lives in `AUTH0_USER_AUDIENCE`; `AUTH0_AUDIENCE` remains the service audience for this API.
 Local test-auth note: role-specific helpers use the separate confidential `Local Test Client` (`AUTH0_TEST_CLIENT_ID` and `AUTH0_TEST_CLIENT_SECRET`, Doppler only), canonical role users, and one cached password-realm token per role/process. Keep Auth0 attack protection enabled and use IP allowlists for local development.
 Auth0 bootstrap note: `uv run auth0-bootstrap --yes --verbose` also deploys the shared credentials-exchange Action that mirrors issued M2M access-token scopes into `permissions`.

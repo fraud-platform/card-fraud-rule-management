@@ -95,7 +95,8 @@ SELECT
   'system',
   now()
 FROM fraud_gov.rule_fields
-WHERE field_id BETWEEN 1 AND 26;
+WHERE field_id BETWEEN 1 AND 26
+ON CONFLICT (field_key, version) DO NOTHING;
 
 -- =============================================================================
 -- 3. Create initial field registry manifest
@@ -118,6 +119,7 @@ VALUES (
   26,
   'system',
   now()
-);
+)
+ON CONFLICT (registry_version) DO NOTHING;
 
 COMMIT;
